@@ -1,16 +1,12 @@
 package com.camicompany.microserviciointegrador.controller;
 
 import com.camicompany.microserviciointegrador.dto.CreatePaymentRequest;
-import com.camicompany.microserviciointegrador.dto.CreatePaymentResponseDto;
+import com.camicompany.microserviciointegrador.dto.PaymentResponse;
 import com.camicompany.microserviciointegrador.service.PaymentService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
+import org.springframework.web.bind.annotation.*;
 
 
 @RestController
@@ -24,8 +20,14 @@ public class PaymentController {
     }
 
     @PostMapping
-    public ResponseEntity<CreatePaymentResponseDto> createPayment(@Valid @RequestBody CreatePaymentRequest request) {
-        CreatePaymentResponseDto paymentResponse = paymentService.createPayment(request);
+    public ResponseEntity<PaymentResponse> createPayment(@Valid @RequestBody CreatePaymentRequest request) {
+        PaymentResponse paymentResponse = paymentService.createPayment(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(paymentResponse);
+    }
+
+    @GetMapping("/{idSp}")
+    public ResponseEntity<PaymentResponse> getPayment(@PathVariable String idSp) {
+        PaymentResponse paymentResponse = paymentService.getPayment(idSp);
+        return ResponseEntity.ok(paymentResponse);
     }
 }
