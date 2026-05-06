@@ -33,7 +33,7 @@ public class HelipagosClient {
         try {
             return webClient.post()
                     .uri(baseUrl + createPaymentPath)
-                    .header("token", token)
+                    .header("Authorization", "Bearer " + token)
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(HelipagosCreatePaymentResponse.class)
