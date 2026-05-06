@@ -111,4 +111,34 @@ public class HelipagosClient {
             throw new ExternalServiceException("Unexpected error from Helipagos", e);
         }
     }
+
+    public void cancelPayment(String idSp) {
+
+        try {
+            webClient.put()
+                    .uri(baseUrl + cancelPaymentPath + "?id=" + idSp)
+                    .header("Authorization", "Bearer " + token)
+                    .header("Content-Type", "application/json")
+                    .retrieve()
+                    .toBodilessEntity() // 👈 clave
+                    .block();
+
+        } catch (WebClientRequestException e) {
+            throw new ExternalServiceException("Helipagos not available", e);
+
+        } catch (WebClientResponseException e) {
+
+            if (e.getStatusCode().is5xxServerError()) {
+                throw new ExternalServiceException("Helipagos server error", e);
+            }
+
+            if (e.getStatusCode().is4xxClientError()) {
+                throw new ExternalServiceBadRequestException(
+                        "Invalid cancel request to Helipagos: " + e.getResponseBodyAsString(), e
+                );
+            }
+
+            throw new ExternalServiceException("Unexpected error from Helipagos", e);
+        }
+    }
 }

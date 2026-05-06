@@ -2,9 +2,11 @@ package com.camicompany.microserviciointegrador.service;
 
 import com.camicompany.microserviciointegrador.client.HelipagosClient;
 import com.camicompany.microserviciointegrador.domain.Payment;
+import com.camicompany.microserviciointegrador.domain.PaymentStatus;
 import com.camicompany.microserviciointegrador.dto.*;
 import com.camicompany.microserviciointegrador.exception.ExternalServiceException;
 import com.camicompany.microserviciointegrador.exception.ResourceNotFoundException;
+import com.camicompany.microserviciointegrador.exception.StatusConflictException;
 import com.camicompany.microserviciointegrador.mapper.PaymentMapper;
 import com.camicompany.microserviciointegrador.repository.PaymentRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,7 +14,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.UUID;
+
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,6 +119,50 @@ public class PaymentServiceImp implements PaymentService {
         // 5. Devolver respuesta
         return PaymentMapper.toResponseDto(payment);
 
+    }
+
+    @Override
+    public PaymentResponse cancelPayment(String idSp) {
+        // 1. Buscar en DB
+        Payment payment = paymentRepository.findByIdSp(idSp)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment not found with id_sp: " + idSp));
+
+        String estadoExterno = payment.getEstadoExterno();
+        // 2. Validar estado nulo (defensivo)
+        if (estadoExterno == null || estadoExterno.isBlank()) {
+            throw new ExternalServiceException(
+                    "Cannot determine external state for payment " + idSp);
+        }
+
+        // 3. Idempotencia (ya cancelado)
+        if ("VENCIDA".equalsIgnoreCase(estadoExterno)) {
+            log.info("Payment {} already cancelled (idempotent)", idSp);
+            return PaymentMapper.toResponseDto(payment);
+        }
+
+        // 4. Validación de negocio según Helipagos
+        // Solo permite cancelar si está en GENERADA o RECHAZADA
+        if (!canBeCancelled(estadoExterno)) {throw new StatusConflictException(
+                    "Cannot cancel payment in state: " + estadoExterno);
+        }
+
+        // 5. Llamar a Helipagos
+        helipagosClient.cancelPayment(idSp);
+
+        // 6. Actualizar estado local (optimista)
+        payment.setEstadoExterno("VENCIDA");
+        payment.setEstadoInterno(PaymentStatus.CANCELLED);
+
+        // 7. Guardar
+        paymentRepository.save(payment);
+
+        // 8. Devolver
+        return PaymentMapper.toResponseDto(payment);
+    }
+
+    private boolean canBeCancelled(String estado) {
+        return "GENERADA".equalsIgnoreCase(estado) ||
+                "RECHAZADA".equalsIgnoreCase(estado);
     }
 
 }

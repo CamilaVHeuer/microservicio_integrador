@@ -9,4 +9,6 @@ public interface PaymentService {
 
     PaymentResponse getPayment(String idSp);
 
+    PaymentResponse cancelPayment(String idSp);
+
 }

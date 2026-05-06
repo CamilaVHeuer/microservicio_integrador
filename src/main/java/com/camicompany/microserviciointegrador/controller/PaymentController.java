@@ -30,4 +30,10 @@ public class PaymentController {
         PaymentResponse paymentResponse = paymentService.getPayment(idSp);
         return ResponseEntity.ok(paymentResponse);
     }
+
+    @DeleteMapping("/{idSp}")
+    public ResponseEntity<PaymentResponse> cancelPayment(@PathVariable String idSp) {
+        PaymentResponse response = paymentService.cancelPayment(idSp);
+        return ResponseEntity.ok(response);
+    }
 }
