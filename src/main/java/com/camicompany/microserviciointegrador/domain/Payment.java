@@ -37,9 +37,10 @@ public class Payment {
     private LocalDate fechaVto;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "estado_interno", nullable = false)
     private PaymentStatus estadoInterno;
 
+    @Column(name = "estado_externo")
     private String estadoExterno;
 
     @Column(name = "checkout_url")

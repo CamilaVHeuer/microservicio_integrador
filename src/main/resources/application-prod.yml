@@ -11,6 +11,9 @@ spring:
 helipagos:
   base-url: ${HELIPAGOS_BASE_URL}
   token: ${HELIPAGOS_TOKEN}
+  create-payment-path: ${HELIPAGOS_CREATE_PAYMENT_PATH}
+  get-payment-path: ${HELIPAGOS_GET_PAYMENT_PATH}
+  cancel-payment-path: ${HELIPAGOS_CANCEL_PAYMENT_PATH}
 
 app:
   redirect-url: ${REDIRECT_URL}
