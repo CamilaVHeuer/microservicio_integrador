@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.format.DateTimeFormatter;
 
-@Component
 public class PaymentMapper {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
@@ -42,11 +41,12 @@ public class PaymentMapper {
      */
     public static Payment toEntity(
             CreatePaymentRequest request,
-            HelipagosCreatePaymentResponse response
+            HelipagosCreatePaymentResponse response,
+            String referenciaExterna
     ) {
         Payment payment = new Payment();
 
-        payment.setReferenciaExterna(response.referencia_externa());
+        payment.setReferenciaExterna(referenciaExterna);
         payment.setIdSp(String.valueOf(response.id_sp())); // lo mantenemos String
         payment.setImporte(request.importe());
         payment.setDescripcion(request.descripcion());
