@@ -1,11 +1,12 @@
 package com.camicompany.microserviciointegrador.dto;
 
-public record CreatePaymentResponseDto(
+public record PaymentResponse(
+        Long paymentId,
         String id_sp,
         String referencia_externa,
-        String checkout_url,
         String estado_interno,
-        String estado_externo
+        String estado_externo,
+        String checkout_url
 ){}
 
 

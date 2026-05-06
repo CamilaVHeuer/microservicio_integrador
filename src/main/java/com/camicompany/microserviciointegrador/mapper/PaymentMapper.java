@@ -2,11 +2,7 @@ package com.camicompany.microserviciointegrador.mapper;
 
 import com.camicompany.microserviciointegrador.domain.Payment;
 import com.camicompany.microserviciointegrador.domain.PaymentStatus;
-import com.camicompany.microserviciointegrador.dto.CreatePaymentRequest;
-import com.camicompany.microserviciointegrador.dto.CreatePaymentResponseDto;
-import com.camicompany.microserviciointegrador.dto.HelipagosCreatePaymentRequest;
-import com.camicompany.microserviciointegrador.dto.HelipagosCreatePaymentResponse;
-import org.springframework.stereotype.Component;
+import com.camicompany.microserviciointegrador.dto.*;
 
 import java.time.format.DateTimeFormatter;
 
@@ -19,7 +15,6 @@ public class PaymentMapper {
      */
     public static HelipagosCreatePaymentRequest toHelipagosRequest(
             CreatePaymentRequest request,
-            String referenciaExterna,
             String urlRedirect,
             String webhook
     ) {
@@ -30,7 +25,7 @@ public class PaymentMapper {
                 formattedAmount, // 10 digits, no decimals
                 request.fechaVto().format(DATE_FORMAT), // yyyy-MM-dd
                 request.descripcion(),
-                referenciaExterna,
+                request.referenciaExterna(),
                 urlRedirect,
                 webhook
         );
@@ -41,19 +36,16 @@ public class PaymentMapper {
      */
     public static Payment toEntity(
             CreatePaymentRequest request,
-            HelipagosCreatePaymentResponse response,
-            String referenciaExterna
+            HelipagosCreatePaymentResponse response
     ) {
         Payment payment = new Payment();
 
-        payment.setReferenciaExterna(referenciaExterna);
+        payment.setReferenciaExterna(request.referenciaExterna());
         payment.setIdSp(String.valueOf(response.id_sp())); // lo mantenemos String
         payment.setImporte(request.importe());
         payment.setDescripcion(request.descripcion());
         payment.setFechaVto(request.fechaVto());
-
         payment.setCheckoutUrl(response.checkout_url());
-
         payment.setEstadoExterno(response.estado());
         payment.setEstadoInterno(mapEstado(response.estado()));
 
@@ -63,15 +55,25 @@ public class PaymentMapper {
     /**
      * 3. Entity → DTO salida (tu API)
      */
-    public static CreatePaymentResponseDto toResponseDto(Payment payment) {
-        return new CreatePaymentResponseDto(
+    public static PaymentResponse toResponseDto(Payment payment) {
+        return new PaymentResponse(
+                payment.getId(),
                 payment.getIdSp(),
                 payment.getReferenciaExterna(),
-                payment.getCheckoutUrl(),
                 payment.getEstadoInterno().name(),
-                payment.getEstadoExterno()
+                payment.getEstadoExterno(),
+                payment.getCheckoutUrl()
         );
     }
+
+    public static void syncStatusFromHelipagos(
+            Payment payment,
+            String estadoExterno) {
+
+        payment.setEstadoExterno(estadoExterno);
+        payment.setEstadoInterno(mapEstado(estadoExterno));
+    }
+
 
     /**
      * 4. Mapping estado externo → estado interno

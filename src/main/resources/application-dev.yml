@@ -22,3 +22,9 @@ helipagos:
 app:
   redirect-url: ${REDIRECT_URL}
   webhook-url: ${WEBHOOK_URL}
+
+logging:
+  level:
+    root: INFO
+    com.camicompany.microserviciointegrador: DEBUG
+    org.springframework.web: DEBUG

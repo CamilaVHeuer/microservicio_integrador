@@ -11,5 +11,7 @@ public record CreatePaymentRequest (
         @NotBlank
         String descripcion,
         @NotNull
-        LocalDate fechaVto
+        LocalDate fechaVto,
+        @NotBlank
+        String referenciaExterna
 ){}
