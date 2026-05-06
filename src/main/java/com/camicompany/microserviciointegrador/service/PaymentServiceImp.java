@@ -32,16 +32,16 @@ public class PaymentServiceImp implements PaymentService {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentServiceImp.class);
 
-     public PaymentServiceImp(PaymentRepository paymentRepository, HelipagosClient helipagosClient,
-                              @Value("${app.redirect-url}") String redirectUrl,
-                              @Value("${app.webhook-url}") String webhookUrl,
-                              @Value("${app.api-key}") String apiKey) {
-         this.paymentRepository = paymentRepository;
-         this.helipagosClient = helipagosClient;
-         this.redirectUrl = redirectUrl;
-         this.webhookUrl = webhookUrl;
-         this.apiKey = apiKey;
-     }
+    public PaymentServiceImp(PaymentRepository paymentRepository, HelipagosClient helipagosClient,
+                             @Value("${app.redirect-url}") String redirectUrl,
+                             @Value("${app.webhook-url}") String webhookUrl,
+                             @Value("${app.api-key}") String apiKey) {
+        this.paymentRepository = paymentRepository;
+        this.helipagosClient = helipagosClient;
+        this.redirectUrl = redirectUrl;
+        this.webhookUrl = webhookUrl;
+        this.apiKey = apiKey;
+    }
 
     @Override
     public PaymentResponse createPayment(CreatePaymentRequest request) {
@@ -64,6 +64,7 @@ public class PaymentServiceImp implements PaymentService {
                 );
 
         // 3. Llamar a Helipagos
+        log.info("Outgoing request to create payment {} in Helipagos", request.referenciaExterna());
         HelipagosCreatePaymentResponse helipagosResponse =
                 helipagosClient.createPayment(helipagosRequest);
 
@@ -84,59 +85,34 @@ public class PaymentServiceImp implements PaymentService {
             // 6. Mapear a DTO de salida
             return PaymentMapper.toResponseDto(savedPayment);
         } catch (DataIntegrityViolationException e) {
-            // 🔥 caso concurrencia: otro request insertó primero
+            // caso concurrencia: otro request insertó primero
             log.error("Concurrent request detected for referencia_externa {}",
                     request.referenciaExterna());
 
             Payment alreadyCreated = paymentRepository
                     .findByReferenciaExterna(request.referenciaExterna())
-                    .orElseThrow(() -> e); // muy improbable, pero defensivo
-
+                    .orElseThrow(() -> {
+                        log.error("Duplicated referencia_externa not found {}", request.referenciaExterna());
+                        return e;
+                    }); // muy improbable, pero defensivo
             return PaymentMapper.toResponseDto(alreadyCreated);
         }
     }
 
     @Override
     public PaymentResponse getPayment(String idSp) {
-
-        // 1. Buscar en DB
-        Payment payment = paymentRepository.findByIdSp(idSp).orElseThrow(() -> new ResourceNotFoundException("Payment not found with id_sp: " + idSp));
-
-        // 2. Consultar estado en Helipagos
-        HelipagosGetPaymentResponse response =
-                helipagosClient.getPayment(idSp);
-
-        // 🔴 VALIDACIÓN CLAVE
-        if (response.estado_pago() == null || response.estado_pago().isBlank()) {
-            log.error("Helipagos returned invalid estado_pago for id_sp {}: {}", idSp, response.estado_pago());
-            throw new ExternalServiceException("Invalid response from Helipagos: estado_pago is null or blank");
-        }
-        // 3. Sincronizar estado
-        if(!payment.getEstadoExterno().equals(response.estado_pago())) {
-            log.info("Payment {} updated status: {} -> {}",
-                    idSp, payment.getEstadoExterno(), response.estado_pago());
-            PaymentMapper.syncStatusFromHelipagos(payment, response.estado_pago());
-
-            // 4. Guardar actualización
-            paymentRepository.save(payment);
-        }
-        // 5. Devolver respuesta
+        // 1. Obtener payment y sincronizar estado con Helipagos
+        Payment payment = getAndSyncPayment(idSp);
+        // 2. Devolver respuesta
         return PaymentMapper.toResponseDto(payment);
 
     }
 
     @Override
     public PaymentResponse cancelPayment(String idSp) {
-        // 1. Buscar en DB
-        Payment payment = paymentRepository.findByIdSp(idSp)
-                .orElseThrow(() -> new ResourceNotFoundException("Payment not found with id_sp: " + idSp));
+        Payment payment = getAndSyncPayment(idSp);
 
         String estadoExterno = payment.getEstadoExterno();
-        // 2. Validar estado nulo (defensivo)
-        if (estadoExterno == null || estadoExterno.isBlank()) {
-            throw new ExternalServiceException(
-                    "Cannot determine external state for payment " + idSp);
-        }
 
         // 3. Idempotencia (ya cancelado)
         if ("VENCIDA".equalsIgnoreCase(estadoExterno)) {
@@ -146,11 +122,12 @@ public class PaymentServiceImp implements PaymentService {
 
         // 4. Validación de negocio según Helipagos
         // Solo permite cancelar si está en GENERADA o RECHAZADA
-        if (!canBeCancelled(estadoExterno)) {throw new StatusConflictException(
+        if (!canBeCancelled(estadoExterno)) {
+            throw new StatusConflictException(
                     "Cannot cancel payment in state: " + estadoExterno);
         }
-
-        // 5. Llamar a Helipagos
+        // 5. Llamar a Helipagos para cancelar
+        log.info("Outgoing request to cancel payment {} in Helipagos", idSp);
         helipagosClient.cancelPayment(idSp);
 
         // 6. Actualizar estado local (optimista)
@@ -166,6 +143,8 @@ public class PaymentServiceImp implements PaymentService {
 
     @Override
     public void processWebhook(HelipagosWebhookRequest request, String apiKey) {
+
+        log.info("Processing webhook request {}", request.id_sp());
         // 1. validar api key
         if (!validateApiKey(apiKey)) {
             throw new ExternalServiceBadRequestException("Invalid webhook api key");
@@ -185,7 +164,6 @@ public class PaymentServiceImp implements PaymentService {
             return; // no exception, solo ignoramos
         }
 
-
         // 3. Idempotencia: mismo estado
         if (payment.getEstadoExterno() != null && payment.getEstadoExterno().equalsIgnoreCase(request.estado())) {
             log.info("Duplicate webhook ignored for payment {}", request.id_sp());
@@ -196,7 +174,6 @@ public class PaymentServiceImp implements PaymentService {
         PaymentMapper.syncStatusFromHelipagos(payment, request.estado());
 
         paymentRepository.save(payment);
-
         log.info("Webhook processed for payment {}", request.id_sp());
 
     }
@@ -218,4 +195,38 @@ public class PaymentServiceImp implements PaymentService {
         return apiKey != null && apiKey.equals(this.apiKey);
     }
 
+    private Payment getAndSyncPayment(String idSp) {
+        // 1. Buscar en DB
+        Payment payment = paymentRepository.findByIdSp(idSp).orElseThrow(() ->
+                new ResourceNotFoundException("Payment not found with id_sp: " + idSp));
+
+        // 2. Consultar estado en Helipagos
+        log.info("Outgoing request to get payment {} from Helipagos", idSp);
+        HelipagosGetPaymentResponse response =
+                helipagosClient.getPayment(idSp);
+
+        //  VALIDACIÓN CLAVE
+        if (response.estado_pago() == null || response.estado_pago().isBlank()) {
+            log.error("Helipagos returned invalid estado_pago for id_sp {}: {}", idSp, response.estado_pago());
+            throw new ExternalServiceException("Invalid response from Helipagos: estado_pago is null or blank");
+        }
+
+        return syncPayment(payment, response);
+    }
+
+    private Payment syncPayment(Payment payment, HelipagosGetPaymentResponse response) {
+        // 3. Sincronizar estado
+        if (!payment.getEstadoExterno().equals(response.estado_pago())) {
+            log.info("Payment {} updated status: {} -> {}",
+                    payment.getIdSp(), payment.getEstadoExterno(), response.estado_pago());
+            PaymentMapper.syncStatusFromHelipagos(payment, response.estado_pago());
+
+            // 4. Guardar actualización
+            paymentRepository.save(payment);
+        }
+        return payment;
+    }
 }
+
+
+
