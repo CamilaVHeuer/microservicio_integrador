@@ -18,3 +18,4 @@ helipagos:
 app:
   redirect-url: ${REDIRECT_URL}
   webhook-url: ${WEBHOOK_URL}
+  api-key: ${API_KEY}

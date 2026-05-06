@@ -1,6 +1,7 @@
 package com.camicompany.microserviciointegrador.controller;
 
 import com.camicompany.microserviciointegrador.dto.CreatePaymentRequest;
+import com.camicompany.microserviciointegrador.dto.HelipagosWebhookRequest;
 import com.camicompany.microserviciointegrador.dto.PaymentResponse;
 import com.camicompany.microserviciointegrador.service.PaymentService;
 import jakarta.validation.Valid;
@@ -35,5 +36,19 @@ public class PaymentController {
     public ResponseEntity<PaymentResponse> cancelPayment(@PathVariable String idSp) {
         PaymentResponse response = paymentService.cancelPayment(idSp);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/webhook")
+    public ResponseEntity<Void> receiveWebhook(
+            @RequestBody HelipagosWebhookRequest request, @RequestHeader("api-key") String apiKey) {
+
+        paymentService.processWebhook(request, apiKey);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/owner/{idSp}")
+    public ResponseEntity<PaymentResponse> getPaymentByIdSp(@PathVariable String idSp) {
+        PaymentResponse paymentResponse = paymentService.getPaymentByIsSp(idSp);
+        return ResponseEntity.ok(paymentResponse);
     }
 }

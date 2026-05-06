@@ -1,6 +1,7 @@
 package com.camicompany.microserviciointegrador.service;
 
 import com.camicompany.microserviciointegrador.dto.CreatePaymentRequest;
+import com.camicompany.microserviciointegrador.dto.HelipagosWebhookRequest;
 import com.camicompany.microserviciointegrador.dto.PaymentResponse;
 
 public interface PaymentService {
@@ -10,5 +11,9 @@ public interface PaymentService {
     PaymentResponse getPayment(String idSp);
 
     PaymentResponse cancelPayment(String idSp);
+
+    void processWebhook(HelipagosWebhookRequest request, String apiKey);
+
+    PaymentResponse getPaymentByIsSp(String idSp);
 
 }

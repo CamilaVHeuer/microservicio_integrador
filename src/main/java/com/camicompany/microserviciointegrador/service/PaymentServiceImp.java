@@ -4,6 +4,7 @@ import com.camicompany.microserviciointegrador.client.HelipagosClient;
 import com.camicompany.microserviciointegrador.domain.Payment;
 import com.camicompany.microserviciointegrador.domain.PaymentStatus;
 import com.camicompany.microserviciointegrador.dto.*;
+import com.camicompany.microserviciointegrador.exception.ExternalServiceBadRequestException;
 import com.camicompany.microserviciointegrador.exception.ExternalServiceException;
 import com.camicompany.microserviciointegrador.exception.ResourceNotFoundException;
 import com.camicompany.microserviciointegrador.exception.StatusConflictException;
@@ -27,16 +28,19 @@ public class PaymentServiceImp implements PaymentService {
     private final HelipagosClient helipagosClient;
     private final String redirectUrl;
     private final String webhookUrl;
+    private final String apiKey;
 
     private static final Logger log = LoggerFactory.getLogger(PaymentServiceImp.class);
 
      public PaymentServiceImp(PaymentRepository paymentRepository, HelipagosClient helipagosClient,
                               @Value("${app.redirect-url}") String redirectUrl,
-                              @Value("${app.webhook-url}") String webhookUrl) {
+                              @Value("${app.webhook-url}") String webhookUrl,
+                              @Value("${app.api-key}") String apiKey) {
          this.paymentRepository = paymentRepository;
          this.helipagosClient = helipagosClient;
          this.redirectUrl = redirectUrl;
          this.webhookUrl = webhookUrl;
+         this.apiKey = apiKey;
      }
 
     @Override
@@ -160,9 +164,58 @@ public class PaymentServiceImp implements PaymentService {
         return PaymentMapper.toResponseDto(payment);
     }
 
+    @Override
+    public void processWebhook(HelipagosWebhookRequest request, String apiKey) {
+        // 1. validar api key
+        if (!validateApiKey(apiKey)) {
+            throw new ExternalServiceBadRequestException("Invalid webhook api key");
+        }
+
+        //VALIDACIÓN CLAVE
+        if (request.estado() == null || request.estado().isBlank()) {
+            log.error("Invalid webhook estado for id_sp {}: {}", request.id_sp(), request.estado());
+            throw new ExternalServiceException("Invalid webhook payload: estado is null or blank");
+        }
+
+        // 2. buscar payment
+        Payment payment = paymentRepository.findByIdSp(
+                String.valueOf(request.id_sp())).orElse(null);
+        if (payment == null) {
+            log.warn("Webhook received for unknown payment id_sp {}", request.id_sp());
+            return; // no exception, solo ignoramos
+        }
+
+
+        // 3. Idempotencia: mismo estado
+        if (payment.getEstadoExterno() != null && payment.getEstadoExterno().equalsIgnoreCase(request.estado())) {
+            log.info("Duplicate webhook ignored for payment {}", request.id_sp());
+            return;
+        }
+
+        // 4. Sincronizar estado
+        PaymentMapper.syncStatusFromHelipagos(payment, request.estado());
+
+        paymentRepository.save(payment);
+
+        log.info("Webhook processed for payment {}", request.id_sp());
+
+    }
+
+    @Override
+    public PaymentResponse getPaymentByIsSp(String idSp) {
+        Payment payment = paymentRepository.findByIdSp(idSp)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment not found with id_sp: " + idSp));
+        return PaymentMapper.toResponseDto(payment);
+    }
+
+
     private boolean canBeCancelled(String estado) {
         return "GENERADA".equalsIgnoreCase(estado) ||
                 "RECHAZADA".equalsIgnoreCase(estado);
+    }
+
+    private boolean validateApiKey(String apiKey) {
+        return apiKey != null && apiKey.equals(this.apiKey);
     }
 
 }
