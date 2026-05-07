@@ -39,8 +39,7 @@ public class PaymentController {
     }
 
     @PostMapping("/webhook")
-    public ResponseEntity<Void> receiveWebhook(
-            @RequestBody HelipagosWebhookRequest request, @RequestHeader("api-key") String apiKey) {
+    public ResponseEntity<Void> receiveWebhook(@RequestBody HelipagosWebhookRequest request, @RequestHeader("api-key") String apiKey) {
 
         paymentService.processWebhook(request, apiKey);
         return ResponseEntity.ok().build();
