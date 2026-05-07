@@ -4,6 +4,9 @@ import com.camicompany.microserviciointegrador.client.HelipagosClient;
 import com.camicompany.microserviciointegrador.domain.Payment;
 import com.camicompany.microserviciointegrador.domain.PaymentStatus;
 import com.camicompany.microserviciointegrador.dto.*;
+import com.camicompany.microserviciointegrador.dto.createPaymentDto.CreatePaymentRequest;
+import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentRequest;
+import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentResponse;
 import com.camicompany.microserviciointegrador.exception.ExternalServiceBadRequestException;
 import com.camicompany.microserviciointegrador.exception.ExternalServiceException;
 import com.camicompany.microserviciointegrador.exception.ResourceNotFoundException;
@@ -44,13 +47,15 @@ public class PaymentServiceImp implements PaymentService {
 
     @Override
     public PaymentResponse createPayment(CreatePaymentRequest request) {
+
+        String referenciaExternaNormalized = PaymentMapper.normalizeReference(request.referenciaExterna());
         // 1. Verificar idempotencia
         Payment existingPayment = paymentRepository
-                .findByReferenciaExterna(request.referenciaExterna())
+                .findByReferenciaExterna(referenciaExternaNormalized)
                 .orElse(null);
 
         if (existingPayment != null) {
-            log.info("Idempotent request detected for referencia_externa {}", request.referenciaExterna());
+            log.info("Idempotent request detected for referencia_externa {}", referenciaExternaNormalized);
             return PaymentMapper.toResponseDto(existingPayment);
         }
 
@@ -63,15 +68,15 @@ public class PaymentServiceImp implements PaymentService {
                 );
 
         // 3. Llamar a Helipagos
-        log.info("Outgoing request to create payment {} in Helipagos", request.referenciaExterna());
+        log.info("Outgoing request to create payment {} in Helipagos", referenciaExternaNormalized);
         HelipagosCreatePaymentResponse helipagosResponse =
                 helipagosClient.createPayment(helipagosRequest);
 
         //Validacion defensiva
         if (helipagosResponse.referencia_externa() == null ||
-                !request.referenciaExterna().equals(helipagosResponse.referencia_externa())) {
+                !referenciaExternaNormalized.equals(helipagosResponse.referencia_externa())) {
             log.warn("Helipagos mismatch referencia_externa. Sent: {}, Received: {}",
-                    request.referenciaExterna(), helipagosResponse.referencia_externa());
+                    referenciaExternaNormalized, helipagosResponse.referencia_externa());
         }
 
         // 4. Mapear a entidad
@@ -85,13 +90,13 @@ public class PaymentServiceImp implements PaymentService {
             return PaymentMapper.toResponseDto(savedPayment);
         } catch (DataIntegrityViolationException e) {
             // caso concurrencia: otro request insertó primero
-            log.error("Concurrent request detected for referencia_externa {}",
-                    request.referenciaExterna());
+            log.error("Duplicate referencia_externa detected {}",
+                    referenciaExternaNormalized);
 
             Payment alreadyCreated = paymentRepository
-                    .findByReferenciaExterna(request.referenciaExterna())
+                    .findByReferenciaExterna(referenciaExternaNormalized)
                     .orElseThrow(() -> {
-                        log.error("Duplicated referencia_externa not found {}", request.referenciaExterna());
+                        log.error("Duplicated referencia_externa not found {}", referenciaExternaNormalized);
                         return e;
                     }); // muy improbable, pero defensivo
             return PaymentMapper.toResponseDto(alreadyCreated);
