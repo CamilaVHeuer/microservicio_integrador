@@ -3,6 +3,9 @@ package com.camicompany.microserviciointegrador.mapper;
 import com.camicompany.microserviciointegrador.domain.Payment;
 import com.camicompany.microserviciointegrador.domain.PaymentStatus;
 import com.camicompany.microserviciointegrador.dto.*;
+import com.camicompany.microserviciointegrador.dto.createPaymentDto.CreatePaymentRequest;
+import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentRequest;
+import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentResponse;
 
 import java.time.format.DateTimeFormatter;
 
@@ -25,7 +28,7 @@ public class PaymentMapper {
                 formattedAmount, // 10 digits, no decimals
                 request.fechaVto().format(DATE_FORMAT), // yyyy-MM-dd
                 request.descripcion(),
-                request.referenciaExterna(),
+                normalizeReference(request.referenciaExterna()),
                 urlRedirect,
                 webhook
         );
@@ -40,7 +43,7 @@ public class PaymentMapper {
     ) {
         Payment payment = new Payment();
 
-        payment.setReferenciaExterna(request.referenciaExterna());
+        payment.setReferenciaExterna(normalizeReference(request.referenciaExterna()));
         payment.setIdSp(String.valueOf(response.id_sp())); // lo mantenemos String
         payment.setImporte(request.importe());
         payment.setDescripcion(request.descripcion());
@@ -96,6 +99,14 @@ public class PaymentMapper {
 
             default -> PaymentStatus.FAILED;
         };
+    }
+
+    public static String normalizeReference(String referencia) {
+
+        if (referencia == null) {
+            return null;}
+
+        return referencia.trim().toUpperCase();
     }
 }
 

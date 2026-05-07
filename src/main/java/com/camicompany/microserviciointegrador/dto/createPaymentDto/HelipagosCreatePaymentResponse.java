@@ -1,4 +1,4 @@
-package com.camicompany.microserviciointegrador.dto;
+package com.camicompany.microserviciointegrador.dto.createPaymentDto;
 
 public record HelipagosCreatePaymentResponse(
         Integer id_sp,
