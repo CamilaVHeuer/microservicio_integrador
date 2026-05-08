@@ -182,13 +182,6 @@ public class PaymentServiceImp implements PaymentService {
 
     }
 
-    @Override
-    public PaymentResponse getPaymentByIsSp(String idSp) {
-        Payment payment = paymentRepository.findByIdSp(idSp)
-                .orElseThrow(() -> new ResourceNotFoundException("Payment not found with id_sp: " + idSp));
-        return PaymentMapper.toResponseDto(payment);
-    }
-
 
     private boolean canBeCancelled(String estado) {
         return "GENERADA".equalsIgnoreCase(estado) ||
