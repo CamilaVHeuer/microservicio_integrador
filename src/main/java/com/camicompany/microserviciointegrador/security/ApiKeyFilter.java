@@ -1,5 +1,6 @@
 package com.camicompany.microserviciointegrador.security;
 
+import com.camicompany.microserviciointegrador.config.CustomAuthenticationEntryPoint;
 import com.camicompany.microserviciointegrador.domain.ApiKey;
 import com.camicompany.microserviciointegrador.repository.ApiKeyRepository;
 import com.camicompany.microserviciointegrador.utils.ApiKeyUtils;
@@ -8,6 +9,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.lang.NonNull;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -60,18 +63,14 @@ public class ApiKeyFilter extends OncePerRequestFilter {
 
             // 4. No existe
             if (storedKey == null) {
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                        "Invalid API key");
-                return;
+                throw new BadCredentialsException("Invalid api-key");
             }
 
             // 5. Verificar expiración
             if (storedKey.getExpiresAt() != null &&
                     storedKey.getExpiresAt().isBefore(LocalDateTime.now())) {
 
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                        "API key expired");
-                return;
+                throw new CredentialsExpiredException("API key expired");
             }
 
             // 6. Verificar hash
@@ -80,10 +79,8 @@ public class ApiKeyFilter extends OncePerRequestFilter {
                     storedKey.getKeyHash()
             );
 
-            if (!valid) {
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                        "Invalid API key");
-                return;
+            if (!valid)  {
+                throw new BadCredentialsException("Invalid api-key");
             }
 
             // 7. Crear autenticación
@@ -99,10 +96,10 @@ public class ApiKeyFilter extends OncePerRequestFilter {
                     .setAuthentication(authentication);
 
         } catch (IllegalArgumentException e) {
-
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                    "Invalid API key format");
-
+            response.sendError(
+                    HttpServletResponse.SC_UNAUTHORIZED,
+                    "Invalid API key format"
+            );
             return;
         }
 
