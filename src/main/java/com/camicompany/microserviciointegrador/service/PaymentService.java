@@ -14,6 +14,5 @@ public interface PaymentService {
 
     void processWebhook(HelipagosWebhookRequest request, String apiKey);
 
-    PaymentResponse getPaymentByIsSp(String idSp);
 
 }

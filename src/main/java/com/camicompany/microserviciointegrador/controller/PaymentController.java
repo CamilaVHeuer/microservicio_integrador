@@ -74,15 +74,4 @@ public class PaymentController {
         return ResponseEntity.ok().build();
     }
 
-    @Operation(summary = "Get payment details by external identifier (idSp) for the internal use")
-    @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Payment found",
-            content = @Content(mediaType = "application/json", schema = @Schema(implementation = PaymentResponse.class))),
-        @ApiResponse(responseCode = "404", description = "Payment not found", content = @Content)
-    })
-    @GetMapping("/internal/{idSp}")
-    public ResponseEntity<PaymentResponse> getPaymentByIdSp(@PathVariable String idSp) {
-        PaymentResponse paymentResponse = paymentService.getPaymentByIsSp(idSp);
-        return ResponseEntity.ok(paymentResponse);
-    }
 }

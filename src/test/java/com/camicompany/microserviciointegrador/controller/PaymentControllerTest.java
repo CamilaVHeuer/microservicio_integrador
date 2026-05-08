@@ -189,19 +189,6 @@ public class PaymentControllerTest {
     }
 
     @Test
-        void getPaymentByIdSpShouldReturn200() throws Exception {
-        PaymentResponse resp = new PaymentResponse(1L, "1", "REF123456", "GENERATED", "GENERADA", "url");
-        when(paymentService.getPaymentByIsSp("1")).thenReturn(resp);
-        mockMvc.perform(get( BASE_URL + "/internal/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id_sp").value("1"))
-                .andExpect(jsonPath("$.referencia_externa").value("REF123456"))
-                .andExpect(jsonPath("$.estado_interno").value("GENERATED"))
-                .andExpect(jsonPath("$.estado_externo").value("GENERADA"))
-                .andExpect(jsonPath("$.checkout_url").value("url"));
-    }
-
-    @Test
     void webhookShouldReturn200() throws Exception {
         HelipagosWebhookRequest req = new HelipagosWebhookRequest(1, "PROCESADA",
                 "REF123",null, null, null
