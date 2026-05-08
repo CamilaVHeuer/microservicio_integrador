@@ -9,6 +9,7 @@ public record RegisterRequest(
         @Schema(example = "John_123")
         @NotBlank(message = "The username is required")
         String username,
+        @NotBlank(message = "The password is required")
         @Schema(example = "J1_password")
         @Size(min = 8, message = "Password must be at least 8 characters")
         @Pattern(

@@ -151,7 +151,7 @@ public class PaymentServiceImp implements PaymentService {
         log.info("Processing webhook request {}", request.id_sp());
         // 1. validar api key
         if (!validateApiKey(apiKey)) {
-            throw new ExternalServiceBadRequestException("Invalid webhook api key");
+            throw new ExternalServiceBadRequestException("Invalid webhook api-key");
         }
 
         //VALIDACIÓN CLAVE

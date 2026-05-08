@@ -9,16 +9,16 @@ import java.time.LocalDate;
 
 public record CreatePaymentRequest (
         @Schema(example = "10000")
-        @NotNull
+        @NotNull(message = "The amount cannot be null")
         Long importe,
         @Schema(example = "Pago de servicios")
-        @NotBlank
+        @NotBlank(message = "The description cannot be blank")
         String descripcion,
         @Schema(example = "2026-12-31")
-        @NotNull
-        @FutureOrPresent(message = "The expiration date cannot be earlier than today.")
+        @NotNull(message = "The expiration date cannot be null")
+        @FutureOrPresent(message = "The expiration date cannot be earlier than today")
         LocalDate fechaVto,
         @Schema(example = "REF123456")
-        @NotBlank
+        @NotBlank(message = "The external reference cannot be blank")
         String referenciaExterna
 ){}
