@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.CreatePaymentRequest;
-import com.camicompany.microserviciointegrador.dto.HelipagosWebhookRequest;
+import com.camicompany.microserviciointegrador.dto.weebhookDto.HelipagosWebhookRequest;
 import com.camicompany.microserviciointegrador.dto.PaymentResponse;
 import com.camicompany.microserviciointegrador.service.PaymentService;
 import jakarta.validation.Valid;

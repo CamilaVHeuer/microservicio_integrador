@@ -1,4 +1,4 @@
-package com.camicompany.microserviciointegrador.domain;
+package com.camicompany.microserviciointegrador.domain.auth;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

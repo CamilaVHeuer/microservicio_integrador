@@ -1,4 +1,4 @@
-package com.camicompany.microserviciointegrador.domain;
+package com.camicompany.microserviciointegrador.domain.payment;
 
 public enum PaymentStatus {
     GENERATED,

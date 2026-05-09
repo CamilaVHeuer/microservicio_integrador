@@ -2,7 +2,7 @@ package com.camicompany.microserviciointegrador.client;
 
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentRequest;
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentResponse;
-import com.camicompany.microserviciointegrador.dto.HelipagosGetPaymentResponse;
+import com.camicompany.microserviciointegrador.dto.getPaymentDto.HelipagosGetPaymentResponse;
 import com.camicompany.microserviciointegrador.exception.ExternalServiceBadRequestException;
 import com.camicompany.microserviciointegrador.exception.ExternalServiceException;
 import com.camicompany.microserviciointegrador.service.PaymentServiceImp;

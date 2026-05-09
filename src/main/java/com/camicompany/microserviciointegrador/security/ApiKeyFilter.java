@@ -1,7 +1,6 @@
 package com.camicompany.microserviciointegrador.security;
 
-import com.camicompany.microserviciointegrador.config.CustomAuthenticationEntryPoint;
-import com.camicompany.microserviciointegrador.domain.ApiKey;
+import com.camicompany.microserviciointegrador.domain.auth.ApiKey;
 import com.camicompany.microserviciointegrador.repository.ApiKeyRepository;
 import com.camicompany.microserviciointegrador.utils.ApiKeyUtils;
 import jakarta.servlet.FilterChain;

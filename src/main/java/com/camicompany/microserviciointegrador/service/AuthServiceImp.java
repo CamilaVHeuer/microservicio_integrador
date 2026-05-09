@@ -1,10 +1,10 @@
 package com.camicompany.microserviciointegrador.service;
 
-import com.camicompany.microserviciointegrador.domain.ApiKey;
-import com.camicompany.microserviciointegrador.domain.User;
-import com.camicompany.microserviciointegrador.dto.apiKeyDto.ApiKeyRequest;
-import com.camicompany.microserviciointegrador.dto.apiKeyDto.ApiKeyResponse;
-import com.camicompany.microserviciointegrador.dto.registerUserDto.RegisterRequest;
+import com.camicompany.microserviciointegrador.domain.auth.ApiKey;
+import com.camicompany.microserviciointegrador.domain.auth.User;
+import com.camicompany.microserviciointegrador.dto.authDto.ApiKeyRequest;
+import com.camicompany.microserviciointegrador.dto.authDto.ApiKeyResponse;
+import com.camicompany.microserviciointegrador.dto.authDto.RegisterRequest;
 import com.camicompany.microserviciointegrador.exception.InvalidCredentialsException;
 import com.camicompany.microserviciointegrador.exception.StatusConflictException;
 import com.camicompany.microserviciointegrador.repository.ApiKeyRepository;

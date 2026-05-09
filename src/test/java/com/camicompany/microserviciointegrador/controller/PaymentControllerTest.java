@@ -1,6 +1,6 @@
 package com.camicompany.microserviciointegrador.controller;
 
-import com.camicompany.microserviciointegrador.dto.HelipagosWebhookRequest;
+import com.camicompany.microserviciointegrador.dto.weebhookDto.HelipagosWebhookRequest;
 import com.camicompany.microserviciointegrador.exception.ResourceNotFoundException;
 import com.camicompany.microserviciointegrador.security.ApiKeyFilter;
 import com.camicompany.microserviciointegrador.service.PaymentService;

@@ -1,10 +1,12 @@
 package com.camicompany.microserviciointegrador.service;
 
 import com.camicompany.microserviciointegrador.client.HelipagosClient;
-import com.camicompany.microserviciointegrador.domain.Payment;
-import com.camicompany.microserviciointegrador.domain.PaymentStatus;
+import com.camicompany.microserviciointegrador.domain.payment.Payment;
+import com.camicompany.microserviciointegrador.domain.payment.PaymentStatus;
 import com.camicompany.microserviciointegrador.dto.*;
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.*;
+import com.camicompany.microserviciointegrador.dto.getPaymentDto.HelipagosGetPaymentResponse;
+import com.camicompany.microserviciointegrador.dto.weebhookDto.HelipagosWebhookRequest;
 import com.camicompany.microserviciointegrador.exception.*;
 import com.camicompany.microserviciointegrador.repository.PaymentRepository;
 import org.junit.jupiter.api.BeforeEach;

@@ -1,4 +1,4 @@
-package com.camicompany.microserviciointegrador.dto;
+package com.camicompany.microserviciointegrador.dto.weebhookDto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 

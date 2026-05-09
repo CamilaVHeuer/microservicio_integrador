@@ -1,6 +1,6 @@
 package com.camicompany.microserviciointegrador.integration;
-import com.camicompany.microserviciointegrador.dto.apiKeyDto.ApiKeyRequest;
-import com.camicompany.microserviciointegrador.dto.registerUserDto.RegisterRequest;
+import com.camicompany.microserviciointegrador.dto.authDto.ApiKeyRequest;
+import com.camicompany.microserviciointegrador.dto.authDto.RegisterRequest;
 import static org.hamcrest.Matchers.containsString;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;

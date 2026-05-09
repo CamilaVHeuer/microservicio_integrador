@@ -4,9 +4,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
-import com.camicompany.microserviciointegrador.dto.apiKeyDto.ApiKeyRequest;
-import com.camicompany.microserviciointegrador.dto.apiKeyDto.ApiKeyResponse;
-import com.camicompany.microserviciointegrador.dto.registerUserDto.RegisterRequest;
+import com.camicompany.microserviciointegrador.dto.authDto.ApiKeyRequest;
+import com.camicompany.microserviciointegrador.dto.authDto.ApiKeyResponse;
+import com.camicompany.microserviciointegrador.dto.authDto.RegisterRequest;
 import com.camicompany.microserviciointegrador.service.AuthService;
 import jakarta.validation.Valid;
 
