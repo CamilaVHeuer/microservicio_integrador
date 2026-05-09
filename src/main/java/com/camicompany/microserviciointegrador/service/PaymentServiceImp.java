@@ -1,12 +1,14 @@
 package com.camicompany.microserviciointegrador.service;
 
 import com.camicompany.microserviciointegrador.client.HelipagosClient;
-import com.camicompany.microserviciointegrador.domain.Payment;
-import com.camicompany.microserviciointegrador.domain.PaymentStatus;
+import com.camicompany.microserviciointegrador.domain.payment.Payment;
+import com.camicompany.microserviciointegrador.domain.payment.PaymentStatus;
 import com.camicompany.microserviciointegrador.dto.*;
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.CreatePaymentRequest;
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentRequest;
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentResponse;
+import com.camicompany.microserviciointegrador.dto.getPaymentDto.HelipagosGetPaymentResponse;
+import com.camicompany.microserviciointegrador.dto.weebhookDto.HelipagosWebhookRequest;
 import com.camicompany.microserviciointegrador.exception.ExternalServiceBadRequestException;
 import com.camicompany.microserviciointegrador.exception.ExternalServiceException;
 import com.camicompany.microserviciointegrador.exception.ResourceNotFoundException;

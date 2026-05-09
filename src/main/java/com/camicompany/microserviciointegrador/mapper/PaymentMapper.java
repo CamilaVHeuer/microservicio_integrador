@@ -1,7 +1,7 @@
 package com.camicompany.microserviciointegrador.mapper;
 
-import com.camicompany.microserviciointegrador.domain.Payment;
-import com.camicompany.microserviciointegrador.domain.PaymentStatus;
+import com.camicompany.microserviciointegrador.domain.payment.Payment;
+import com.camicompany.microserviciointegrador.domain.payment.PaymentStatus;
 import com.camicompany.microserviciointegrador.dto.*;
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.CreatePaymentRequest;
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentRequest;

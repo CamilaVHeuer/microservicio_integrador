@@ -1,7 +1,7 @@
 package com.camicompany.microserviciointegrador.service;
 
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.CreatePaymentRequest;
-import com.camicompany.microserviciointegrador.dto.HelipagosWebhookRequest;
+import com.camicompany.microserviciointegrador.dto.weebhookDto.HelipagosWebhookRequest;
 import com.camicompany.microserviciointegrador.dto.PaymentResponse;
 
 public interface PaymentService {

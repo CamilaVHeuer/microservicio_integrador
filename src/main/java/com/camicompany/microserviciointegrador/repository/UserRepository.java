@@ -1,6 +1,6 @@
 package com.camicompany.microserviciointegrador.repository;
 
-import com.camicompany.microserviciointegrador.domain.User;
+import com.camicompany.microserviciointegrador.domain.auth.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

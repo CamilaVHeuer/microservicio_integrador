@@ -1,7 +1,7 @@
 package com.camicompany.microserviciointegrador.IntegrationSandbox;
 
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.CreatePaymentRequest;
-import com.camicompany.microserviciointegrador.dto.registerUserDto.RegisterRequest;
+import com.camicompany.microserviciointegrador.dto.authDto.RegisterRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Tag;

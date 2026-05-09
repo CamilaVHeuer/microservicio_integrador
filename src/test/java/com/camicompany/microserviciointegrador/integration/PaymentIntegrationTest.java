@@ -1,10 +1,10 @@
 
 package com.camicompany.microserviciointegrador.integration;
-import com.camicompany.microserviciointegrador.dto.HelipagosWebhookRequest;
+import com.camicompany.microserviciointegrador.dto.weebhookDto.HelipagosWebhookRequest;
 import com.camicompany.microserviciointegrador.client.HelipagosClient;
-import com.camicompany.microserviciointegrador.domain.Payment;
-import com.camicompany.microserviciointegrador.domain.PaymentStatus;
-import com.camicompany.microserviciointegrador.dto.HelipagosGetPaymentResponse;
+import com.camicompany.microserviciointegrador.domain.payment.Payment;
+import com.camicompany.microserviciointegrador.domain.payment.PaymentStatus;
+import com.camicompany.microserviciointegrador.dto.getPaymentDto.HelipagosGetPaymentResponse;
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentResponse;
 import com.camicompany.microserviciointegrador.repository.PaymentRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;

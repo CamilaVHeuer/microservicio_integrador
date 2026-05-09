@@ -29,3 +29,4 @@ logging:
     root: INFO
     com.camicompany.microserviciointegrador: DEBUG
     org.springframework.web: DEBUG
+

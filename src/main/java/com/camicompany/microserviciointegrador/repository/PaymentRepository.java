@@ -1,6 +1,6 @@
 package com.camicompany.microserviciointegrador.repository;
 
-import com.camicompany.microserviciointegrador.domain.Payment;
+import com.camicompany.microserviciointegrador.domain.payment.Payment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
