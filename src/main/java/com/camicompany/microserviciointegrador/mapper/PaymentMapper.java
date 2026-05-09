@@ -6,6 +6,7 @@ import com.camicompany.microserviciointegrador.dto.*;
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.CreatePaymentRequest;
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentRequest;
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentResponse;
+import com.camicompany.microserviciointegrador.dto.weebhookDto.HelipagosWebhookRequest;
 
 import java.time.format.DateTimeFormatter;
 
@@ -13,9 +14,6 @@ public class PaymentMapper {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
 
-    /**
-     * 1. DTO interno → DTO Helipagos (request externo)
-     */
     public static HelipagosCreatePaymentRequest toHelipagosRequest(
             CreatePaymentRequest request,
             String urlRedirect,
@@ -34,9 +32,24 @@ public class PaymentMapper {
         );
     }
 
-    /**
-     * 2. DTO interno + response Helipagos → Entity
-     */
+    public static void toEntityFromHelipagosResponse(
+            Payment payment, HelipagosCreatePaymentResponse response
+    ) {
+
+        payment.setIdSp(String.valueOf(response.id_sp()));
+        payment.setCheckoutUrl(response.checkout_url());
+        payment.setEstadoExterno(response.estado());
+        payment.setEstadoInterno(mapEstado(response.estado()));
+    }
+
+    public static void syncPaymentFromWebhook(
+            Payment payment, HelipagosWebhookRequest request
+    ) {
+        payment.setIdSp(String.valueOf(request.id_sp()));
+        payment.setEstadoExterno(request.estado());
+        payment.setEstadoInterno(mapEstado(request.estado()));
+    }
+
     public static Payment toEntity(
             CreatePaymentRequest request,
             HelipagosCreatePaymentResponse response
@@ -44,7 +57,7 @@ public class PaymentMapper {
         Payment payment = new Payment();
 
         payment.setReferenciaExterna(normalizeReference(request.referenciaExterna()));
-        payment.setIdSp(String.valueOf(response.id_sp())); // lo mantenemos String
+        payment.setIdSp(String.valueOf(response.id_sp()));
         payment.setImporte(request.importe());
         payment.setDescripcion(request.descripcion());
         payment.setFechaVto(request.fechaVto());
@@ -55,9 +68,6 @@ public class PaymentMapper {
         return payment;
     }
 
-    /**
-     * 3. Entity → DTO salida (tu API)
-     */
     public static PaymentResponse toResponseDto(Payment payment) {
         return new PaymentResponse(
                 payment.getId(),
@@ -77,10 +87,6 @@ public class PaymentMapper {
         payment.setEstadoInterno(mapEstado(estadoExterno));
     }
 
-
-    /**
-     * 4. Mapping estado externo → estado interno
-     */
     private static PaymentStatus mapEstado(String estadoExterno) {
         if (estadoExterno == null) {
             return PaymentStatus.FAILED;
