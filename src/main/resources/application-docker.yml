@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+helipagos:
+  base-url: ${HELIPAGOS_BASE_URL}
+  token: ${HELIPAGOS_TOKEN}
+  create-payment-path: ${HELIPAGOS_CREATE_PAYMENT_PATH}
+  get-payment-path: ${HELIPAGOS_GET_PAYMENT_PATH}
+  cancel-payment-path: ${HELIPAGOS_CANCEL_PAYMENT_PATH}
+
+app:
+  redirect-url: ${REDIRECT_URL}
+  webhook-url: ${WEBHOOK_URL}
+  api-key: ${API_KEY}
