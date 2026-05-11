@@ -1,15 +1,14 @@
 package com.camicompany.microserviciointegrador.repository;
 
 import com.camicompany.microserviciointegrador.domain.payment.Payment;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-
-import java.util.Optional;
 
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
-    Optional<Payment> findByReferenciaExterna(String referenciaExterna);
+  Optional<Payment> findByReferenciaExterna(String referenciaExterna);
 
-    Optional<Payment> findByIdSp(String idSp);
+  Optional<Payment> findByIdSp(String idSp);
 }

@@ -6,8 +6,7 @@ import com.camicompany.microserviciointegrador.dto.authDto.RegisterRequest;
 
 public interface AuthService {
 
-    ApiKeyResponse registerUser(RegisterRequest registerRequest);
+  ApiKeyResponse registerUser(RegisterRequest registerRequest);
 
-    ApiKeyResponse regenerateApiKey(ApiKeyRequest apiKeyRequest);
-
+  ApiKeyResponse regenerateApiKey(ApiKeyRequest apiKeyRequest);
 }

@@ -7,6 +7,9 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.Collections;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.CredentialsExpiredException;
@@ -16,93 +19,77 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.util.Collections;
-
 @Component
 public class ApiKeyFilter extends OncePerRequestFilter {
 
-    private final ApiKeyUtils apiKeyUtils;
-    private final ApiKeyRepository apiKeyRepository;
-    private final PasswordEncoder passwordEncoder;
+  private final ApiKeyUtils apiKeyUtils;
+  private final ApiKeyRepository apiKeyRepository;
+  private final PasswordEncoder passwordEncoder;
 
-    public ApiKeyFilter(ApiKeyUtils apiKeyUtils,
-                        ApiKeyRepository apiKeyRepository,
-                        PasswordEncoder passwordEncoder) {
+  public ApiKeyFilter(
+      ApiKeyUtils apiKeyUtils, ApiKeyRepository apiKeyRepository, PasswordEncoder passwordEncoder) {
 
-        this.apiKeyUtils = apiKeyUtils;
-        this.apiKeyRepository = apiKeyRepository;
-        this.passwordEncoder = passwordEncoder;
+    this.apiKeyUtils = apiKeyUtils;
+    this.apiKeyRepository = apiKeyRepository;
+    this.passwordEncoder = passwordEncoder;
+  }
+
+  @Override
+  protected void doFilterInternal(
+      @NonNull HttpServletRequest request,
+      @NonNull HttpServletResponse response,
+      @NonNull FilterChain filterChain)
+      throws ServletException, IOException {
+
+    String apiKey = request.getHeader("X-API-KEY");
+
+    // 1. No viene api key
+    if (apiKey == null || apiKey.isBlank()) {
+      filterChain.doFilter(request, response);
+      return;
     }
 
-    @Override
-    protected void doFilterInternal(@NonNull HttpServletRequest request,
-                                    @NonNull HttpServletResponse response,
-                                    @NonNull FilterChain filterChain)
-            throws ServletException, IOException {
+    try {
 
-        String apiKey = request.getHeader("X-API-KEY");
+      // 2. Extraer prefix
+      String prefix = apiKeyUtils.extractPrefix(apiKey);
 
-        // 1. No viene api key
-        if (apiKey == null || apiKey.isBlank()) {
-            filterChain.doFilter(request, response);
-            return;
-        }
+      // 3. Buscar api key por prefix
+      ApiKey storedKey = apiKeyRepository.findByKeyPrefix(prefix).orElse(null);
 
-        try {
+      // 4. No existe
+      if (storedKey == null) {
+        throw new BadCredentialsException("Invalid api-key");
+      }
 
-            // 2. Extraer prefix
-            String prefix = apiKeyUtils.extractPrefix(apiKey);
+      // 5. Verificar expiración
+      if (storedKey.getExpiresAt() != null
+          && storedKey.getExpiresAt().isBefore(LocalDateTime.now())) {
 
-            // 3. Buscar api key por prefix
-            ApiKey storedKey = apiKeyRepository
-                    .findByKeyPrefix(prefix)
-                    .orElse(null);
+        throw new CredentialsExpiredException("API key expired");
+      }
 
-            // 4. No existe
-            if (storedKey == null) {
-                throw new BadCredentialsException("Invalid api-key");
-            }
+      // 6. Verificar hash
+      boolean valid = passwordEncoder.matches(apiKey, storedKey.getKeyHash());
 
-            // 5. Verificar expiración
-            if (storedKey.getExpiresAt() != null &&
-                    storedKey.getExpiresAt().isBefore(LocalDateTime.now())) {
+      if (!valid) {
+        throw new BadCredentialsException("Invalid api-key");
+      }
 
-                throw new CredentialsExpiredException("API key expired");
-            }
+      // 7. Crear autenticación
+      UsernamePasswordAuthenticationToken authentication =
+          new UsernamePasswordAuthenticationToken(
+              storedKey.getUser().getUsername(), null, Collections.emptyList());
 
-            // 6. Verificar hash
-            boolean valid = passwordEncoder.matches(
-                    apiKey,
-                    storedKey.getKeyHash()
-            );
+      // 8. Guardar en contexto
+      SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            if (!valid)  {
-                throw new BadCredentialsException("Invalid api-key");
-            }
-
-            // 7. Crear autenticación
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            storedKey.getUser().getUsername(),
-                            null,
-                            Collections.emptyList()
-                    );
-
-            // 8. Guardar en contexto
-            SecurityContextHolder.getContext()
-                    .setAuthentication(authentication);
-
-        } catch (IllegalArgumentException e) {
-            response.sendError(
-                    HttpServletResponse.SC_UNAUTHORIZED,
-                    "Invalid API key format"
-            );
-            return;
-        }
-
-        // 9. Continuar
-        filterChain.doFilter(request, response);
+    } catch (IllegalArgumentException e) {
+      response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid API key format");
+      return;
     }
+
+    // 9. Continuar
+    filterChain.doFilter(request, response);
+  }
 }
