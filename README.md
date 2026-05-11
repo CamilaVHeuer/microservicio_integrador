@@ -43,9 +43,8 @@ El microservicio está diseñado para ser fácilmente integrable en arquitectura
   **Body:** `CreatePaymentRequest`  
   **Seguridad:** API Key  
   **Respuestas:**
-  - 201: Pago creado
+  - 201: Pago creado y si la referencia externa ya existe (idempotencia)
   - 400: Request inválido
-  - 200: Si la referencia externa ya existe (idempotencia)
 
 - `GET /api/v1/payments/{idSp}`  
   Consulta el estado de un pago por su identificador externo provisto por Helipagos.  
@@ -100,12 +99,13 @@ El microservicio está diseñado para ser fácilmente integrable en arquitectura
 ## Decisiones de Diseño Importantes
 
 - **Idempotencia**:
-  - La creación de pagos es idempotente por `referencia_externa`. Si se recibe dos veces la misma referencia, siempre se devuelve el mismo pago (201 en la primera, 200 en las siguientes).
+  - La creación de pagos es idempotente por `referencia_externa`. Si se recibe dos veces la misma referencia, siempre se devuelve el mismo pago.
+  - La cancelación de un pago: si se recibe más de una vez la misma solicitud de cancelación de un pago, siempre se devuelve el mismo pago con estado cancelado. 
   - El webhook también es idempotente: si el estado recibido es igual al actual, se ignora.
 
 - **Concurrencia**:
-  - Para la creación de un pago no se usa optimistic locking, sino un try-catch: se valida que la referencia externa no exista y se intenta guardar. Si otra request guardó primero, se captura el `DataIntegrityViolationException` y se devuelve el pago ya creado.
-  - Para la cancelación de un pago, sí se usa la columna `version` (optimistic locking) al actualizar el estado.
+  - Para la creación de un pago se usa un try-catch: se valida que la referencia externa no exista y se intenta guardar. Si otra request guardó primero, se captura el `DataIntegrityViolationException` y se devuelve el pago ya creado.
+  - Para la cancelación de un pago, se usa el 'optimisctic locking' implementando la columna `version` al actualizar el estado.
   - En ambos casos, los métodos del servicio son transaccionales (`@Transactional`), por lo que la estrategia es:
     - **Creación**: transacción + restricción UNIQUE en BD para concurrencia.
     - **Cancelación**: transacción + optimistic locking.
@@ -113,7 +113,7 @@ El microservicio está diseñado para ser fácilmente integrable en arquitectura
 - **Validación y Seguridad**:
   - Validaciones exhaustivas en DTOs.
   - Manejo centralizado de errores.
-  - API Key obligatoria en endpoints críticos.
+  - API Key obligatoria en todos los endpoints de operaciones del servicio. 
 
 - **Migraciones**:
   - Flyway gestiona la evolución de la base de datos con scripts versionados.
@@ -221,4 +221,4 @@ docker build -t microservicio-integrador .
 
 ---
 
-TODO
+

@@ -1,11 +1,13 @@
 
 package com.camicompany.microserviciointegrador.integration;
+import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentRequest;
 import com.camicompany.microserviciointegrador.dto.weebhookDto.HelipagosWebhookRequest;
 import com.camicompany.microserviciointegrador.client.HelipagosClient;
 import com.camicompany.microserviciointegrador.domain.payment.Payment;
 import com.camicompany.microserviciointegrador.domain.payment.PaymentStatus;
 import com.camicompany.microserviciointegrador.dto.getPaymentDto.HelipagosGetPaymentResponse;
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentResponse;
+import com.camicompany.microserviciointegrador.exception.ExternalServiceException;
 import com.camicompany.microserviciointegrador.repository.PaymentRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -89,6 +91,18 @@ public class PaymentIntegrationTest {
                 .andExpect(jsonPath("$.message").exists())
                 .andExpect(jsonPath("$.timestamp").exists());
     }
+    @Test
+    void createPaymentWhenHelipagosUnavailableShouldReturn503() throws Exception {
+        CreatePaymentRequest req = new CreatePaymentRequest(10000L, "Pago de servicios", LocalDate.now().plusDays(1), "REF123456");
+        when(helipagosClient.createPayment(any())).thenThrow(new ExternalServiceException("Helipagos unavailable"));
+        mockMvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error").value("SERVICE_UNAVAILABLE"))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
 
     @Test
     void getPaymentShouldReturn200AndSyncStatus() throws Exception {
@@ -129,6 +143,21 @@ public class PaymentIntegrationTest {
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 
+    @Test
+    void getPaymentShouldReturn503WhenHelipagosUnavailable() throws Exception {
+        Payment payment = createPaymentEntity("200", "desc", 10000L, LocalDate.now().plusDays(1),
+                "REF123", "GENERADA", PaymentStatus.GENERATED, "http://checkout-test"
+        );
+        paymentRepository.save(payment);
+        when(helipagosClient.getPayment(any())).thenThrow(new ExternalServiceException("Helipagos unavailable"));
+        mockMvc.perform(get(BASE_URL + "/" + payment.getIdSp()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error").value("SERVICE_UNAVAILABLE"))
+                .andExpect(jsonPath("$.message").value(containsString("Helipagos unavailable")))
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+
 
     @Test
     void cancelPaymentShouldReturn200AndUpdateStatus() throws Exception {
@@ -167,6 +196,29 @@ public class PaymentIntegrationTest {
                 .andExpect(jsonPath("$.error").value("NOT_FOUND"))
                 .andExpect(jsonPath("$.message")
                         .value(containsString("Payment not found with id_sp: 999999")))
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    void cancelPaymentShouldReturn503WhenHelipagosUnavailable() throws Exception {
+        Payment payment = createPaymentEntity("200", "desc", 10000L, LocalDate.now().plusDays(1),
+                "REF123", "GENERADA", PaymentStatus.GENERATED, "http://checkout-test"
+        );
+        paymentRepository.save(payment);
+        when(helipagosClient.getPayment(any()))
+                .thenReturn(new HelipagosGetPaymentResponse(
+                        200,
+                        "GENERADA",
+                        "REF2000"
+                ));
+        doThrow(new ExternalServiceException("Helipagos unavailable"))
+                .when(helipagosClient)
+                .cancelPayment("200");
+
+        mockMvc.perform(delete(BASE_URL + "/" + payment.getIdSp()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error").value("SERVICE_UNAVAILABLE"))
+                .andExpect(jsonPath("$.message").value(containsString("Helipagos unavailable")))
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 

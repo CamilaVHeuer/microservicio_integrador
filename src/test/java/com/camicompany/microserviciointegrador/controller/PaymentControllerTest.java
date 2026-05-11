@@ -1,6 +1,8 @@
 package com.camicompany.microserviciointegrador.controller;
 
+import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentRequest;
 import com.camicompany.microserviciointegrador.dto.weebhookDto.HelipagosWebhookRequest;
+import com.camicompany.microserviciointegrador.exception.ExternalServiceException;
 import com.camicompany.microserviciointegrador.exception.ResourceNotFoundException;
 import com.camicompany.microserviciointegrador.security.ApiKeyFilter;
 import com.camicompany.microserviciointegrador.service.PaymentService;
@@ -137,6 +139,33 @@ public class PaymentControllerTest {
                 .andExpect(jsonPath("$.message").value(containsString("The expiration date cannot be earlier than today")))
                 .andExpect(jsonPath("$.timestamp").exists());
     }
+
+    @Test
+    void createPaymentWhenBadRequestToHelipagosShouldReturn400() throws Exception {
+        CreatePaymentRequest req = new CreatePaymentRequest(10000L, "Pago de servicios", LocalDate.now().minusDays(1), "REF123456");
+        when(paymentService.createPayment(req)).thenThrow(new ExternalServiceBadRequestException("Bad request to Helipagos"));
+        mockMvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    void createPaymentWhenHelipagosUnavailableShouldReturn503() throws Exception {
+        CreatePaymentRequest req = new CreatePaymentRequest(10000L, "Pago de servicios", LocalDate.now().plusDays(1), "REF123456");
+        when(paymentService.createPayment(req)).thenThrow(new ExternalServiceException("Helipagos unavailable"));
+        mockMvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error").value("SERVICE_UNAVAILABLE"))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
 
     @Test
         void getPaymentShouldReturn200() throws Exception {
