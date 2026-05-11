@@ -196,21 +196,22 @@ El proyecto cuenta con integración y despliegue continuo (CI/CD) configurado pa
 ## Cómo Correr el Proyecto Localmente
 
 1. Clonar el repositorio
-   git clone git@github.com:CamilaVHeuer/microservicio_integrador.git
-   cd microservicio_integrador
-
-2. **Configura la base de datos PostgreSQL** y las variables de entorno necesarias en el `application-dev.yml` (perfil para desarrollo).
-   Para poder usar las variables de entorno, define sus valores en un .env.local y luego lo exportas con export $(grep -v '^#' .env | xargs)
+   ```bash
+   - git clone git@github.com:CamilaVHeuer/microservicio_integrador.git
+   - cd microservicio_integrador
+   ```
+2. **Configurar la base de datos PostgreSQL** y las variables de entorno necesarias en el `application-dev.yml` (perfil para desarrollo).
+   Para poder usar las variables de entorno, define sus valores en un .env.local y luego lo exportas con `export $(grep -v '^#' .env | xargs)`
    También se pueden cargar en el entorno del IDE (IntelliJIdea) y setear el perfil "dev" para ejecutar más facilmente la app
-3. **Ejecuta migraciones**: Flyway lo hace automáticamente al levantar la app.
-4. **Compila y ejecuta**:
+3. **Ejecutar migraciones**: Flyway lo hace automáticamente al levantar la app.
+4. **Compilar y ejecutar**:
    ```bash
    ./mvnw clean package
    ./mvnw spring-boot:run
    ```
-   The API will be available at: http://localhost:8080
+   La API estará disponible en: http://localhost:8080
 5. **Health check**:  
-   Accede a `http://localhost:8080/actuator/health`
+   Acceder a `http://localhost:8080/actuator/health`
 
 ### Docker
 
@@ -232,7 +233,8 @@ docker-compose up --build
   ```bash
   ./mvnw test
   ```
-Los test corren con el perfil "test" usando variables de entorno definidas para los test, las mismas se encuentran el application-test.yml. 
+  Los test corren con el perfil "test" usando variables de entorno definidas para los test, las mismas se encuentran el application-test.yml.
+
 ---
 
 ## Base de Datos y Migraciones
