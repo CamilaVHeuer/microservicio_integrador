@@ -27,9 +27,6 @@ public class OpenApiConfig {
                                 .email("cbvillalbaheuer@gmail.com")
                                 .url("https://github.com/CamilaVHeuer")))
 
-            .addServersItem(new Server()
-                        .url("http://localhost:8080"))
-
             .addSecurityItem(
                         new SecurityRequirement()
                                 .addList(securitySchemeName)
