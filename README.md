@@ -100,7 +100,7 @@ El microservicio está diseñado para ser fácilmente integrable en arquitectura
 
 - **Idempotencia**:
   - La creación de pagos es idempotente por `referencia_externa`. Si se recibe dos veces la misma referencia, siempre se devuelve el mismo pago.
-  - La cancelación de un pago: si se recibe más de una vez la misma solicitud de cancelación de un pago, siempre se devuelve el mismo pago con estado cancelado. 
+  - La cancelación de un pago: si se recibe más de una vez la misma solicitud de cancelación de un pago, siempre se devuelve el mismo pago con estado cancelado.
   - El webhook también es idempotente: si el estado recibido es igual al actual, se ignora.
 
 - **Concurrencia**:
@@ -113,7 +113,7 @@ El microservicio está diseñado para ser fácilmente integrable en arquitectura
 - **Validación y Seguridad**:
   - Validaciones exhaustivas en DTOs.
   - Manejo centralizado de errores.
-  - API Key obligatoria en todos los endpoints de operaciones del servicio. 
+  - API Key obligatoria en todos los endpoints de operaciones del servicio.
 
 - **Migraciones**:
   - Flyway gestiona la evolución de la base de datos con scripts versionados.
@@ -126,23 +126,41 @@ El microservicio está diseñado para ser fácilmente integrable en arquitectura
 ## Descripción de Métodos y Estrategias
 
 - **createPayment**:
-  - Verifica idempotencia por referencia externa.
-  - Llama a Helipagos, valida respuesta, guarda el pago.
-  - Estrategia de concurrencia: transacción + manejo de violación de restricción UNIQUE en BD (no optimistic locking).
-  - Devuelve siempre el mismo pago para la misma referencia.
+  - Flujo detallado:
+  1.  Primero se crea y persiste un pago con los datos de la request del cliente (campos: `importe`, `referencia_externa`, `fecha_vto`, `descripcion`). Este registro inicial se guarda con `estado_interno = PENDING`.
+  2.  Si al intentar crear ya existía un pago con la misma `referencia_externa`, el servicio detecta la condición de idempotencia y devuelve el pago existente (evitando duplicados).
+  3.  Si no existe, tras persistir el registro PENDING se llama a Helipagos para crear el pago en su sistema y obtener el `id_sp` necesario para posteriores operaciones (`get`, `cancel`).
+  4.  La implementación usa dos bloques try-catch encadenados:
+  - El primer bloque intenta persistir el pago PENDING. Si se detecta una violación de restricción UNIQUE (otro request creó el mismo `referencia_externa` en paralelo), se captura `DataIntegrityViolationException` y se retorna el pago ya creado (idempotencia por restricción de BD).
+  - El segundo bloque llama a Helipagos y luego actualiza el pago local con la respuesta (asignando `id_sp`, `checkout_url`, `estado_externo`).
+  5.  Manejo de fallos y códigos HTTP:
+  - Si la llamada a Helipagos falla por indisponibilidad (timeout/connection error), el endpoint devuelve 503 (Service Unavailable). El pago ya persistido queda con `estado_interno = ERROR` para indicar que la creación local se realizó pero la confirmación remota no pudo completarse.
+  - Si la llamada a Helipagos devuelve éxito pero el intento de actualizar / persistir los datos devueltos por Helipagos falla (por ejemplo error en el update local), el endpoint devuelve 500 (Internal Server Error) y el pago queda con `estado_interno = ERROR`.
+  6.  Garantía operativa:
+  - Con este diseño queda registrado que se intentó crear el pago aunque fallara la confirmación remota o la actualización local. El servicio deja trazas (logs) del error para facilitar investigación y reconciliación.
+  - Cuando Helipagos posteriormente envía un webhook con el cambio de estado (por ejemplo de `GENERADA` a `PROCESADA`), el endpoint de webhook realiza la reconciliación: busca por `referencia_externa`, sincroniza campos (incluido `id_sp`) y actualiza el pago local. Esto permite recuperar pagos cuyo `id_sp` no pudo almacenarse en el momento de la creación.
+  - Si la conexión a Helipagos falló y el pago quedó almacenado localmente pero no existe en Helipagos, el registro permanecerá en `ERROR` y el cliente deberá reintentar la creación del pago enviando una nueva referencia externa.
+  7. Caso no abordado:
+  - El pago quedó almacenado localemnte pero en Helipagos no se creó. El pago queda con estado interno `ERROR` pero no se puede reintentar su creación desde el cliente con la misma referencia externa.
+    Solución propuesta, sujeta a mayor investigación:
+  - Distinguir los tipos de `ERRORES` (propios o del servicio externo).
+  - Antes de crear un pago consultar localmente por referencia externa y ver el estado interno, si es un error de tipo externo permitir la llamada a Helpagos y actualizar el registro.
+    Este caso no fue desarrollado por cuestiones de tiempo.
 
 - **getPayment**:
   - Sincroniza el estado local con Helipagos antes de responder.
 
 - **cancelPayment**:
   - Primero sincroniza el estado con Helipagos.
-  - Verifica si se puede cancelar.
+  - Verifica si se puede cancelar (solo se pueden cancelar pagos en estado RECHAZADA (FAIL) y GENERADA (CREATED))
   - Llama a Helipagos para cancelar y actualiza el estado local.
   - Es idempotente: si ya está cancelado, devuelve el mismo resultado.
   - Estrategia de concurrencia: transacción + optimistic locking (columna version).
 
 - **processWebhook**:
   - Valida API Key.
+  - Busca el pago por id_sp y si no lo encuentra busca por referencia externa (ambos datos enviados por Helipagos).
+  - En caso de que no exista el id_sp pero si la refencia externa, lo que significa que el microservicio no pudo completar exitosamente la creación del pago quedando un registro incompleto; actualiza el registtro completando con los datos falatantes.
   - Actualiza el estado solo si es diferente al actual.
   - Ignora webhooks duplicados o de pagos inexistentes.
 
@@ -154,45 +172,45 @@ El proyecto cuenta con integración y despliegue continuo (CI/CD) configurado pa
 
 ---
 
-## Cómo Correr el Proyecto
+## Cómo Correr el Proyecto Localmente
 
-1. **Configura la base de datos PostgreSQL** y las variables de entorno necesarias (`application.yml`).
-2. **Ejecuta migraciones**: Flyway lo hace automáticamente al levantar la app.
-3. **Compila y ejecuta**:
+1. Clonar el repositorio
+   git clone git@github.com:CamilaVHeuer/microservicio_integrador.git
+   cd microservicio_integrador
+
+2. **Configura la base de datos PostgreSQL** y las variables de entorno necesarias en el `application-dev.yml` (perfil para desarrollo).
+   Para poder usar las variables de entorno, define sus valores en un .env.local y luego lo exportas con export $(grep -v '^#' .env | xargs)
+   También se pueden cargar en el entorno del IDE (IntelliJIdea) y setear el perfil "dev" para ejecutar más facilmente la app
+3. **Ejecuta migraciones**: Flyway lo hace automáticamente al levantar la app.
+4. **Compila y ejecuta**:
    ```bash
    ./mvnw clean package
-   java -jar target/microserviciointegrador-0.0.1.jar
+   ./mvnw spring-boot:run
    ```
-4. **Health check**:  
-    Accede a `http://localhost:8080/actuator/health`
+   The API will be available at: http://localhost:8080
+5. **Health check**:  
+   Accede a `http://localhost:8080/actuator/health`
 
 ### Docker
 
 Para levantar el microservicio y la base de datos con Docker:
 
+1. Crear un application-docker.yml
+2. Indicar en el docker-compose.yml que se utilizará el perfil docker.
+3. Definir las variables de entorno en un .env
+
 ```bash
 docker-compose up --build
-```
-
-Para solo construir la imagen:
-
-```bash
-docker build -t microservicio-integrador .
 ```
 
 ---
 
 ## Cómo Correr los Tests
 
-- **Unitarios y de integración (excepto sandbox):**
+- **Unitarios y de integración:**
   ```bash
   ./mvnw test
   ```
-- **Tests de integración con sandbox (manual):**
-  ```bash
-  ./mvnw verify -Dgroups=sandbox
-  ```
-  > Estos tests están excluidos del CI por configuración en `pom.xml`.
 
 ---
 
@@ -213,12 +231,134 @@ docker build -t microservicio-integrador .
 3. Los cambios de estado se sincronizan por webhook.
 4. El cliente puede consultar o cancelar pagos en cualquier momento.
 
+### Ejemplos (request / response)
+
+1. Crear pago - Happy path (201 Created)
+
+Request POST /api/v1/payments
+
+```json
+{
+  "importe": 10000,
+  "descripcion": "Pago de servicios",
+  "fechaVto": "2026-12-31",
+  "referenciaExterna": "REF123456"
+}
+```
+
+Response 201
+
+```json
+{
+  "paymentId": 1,
+  "id_sp": "123",
+  "referencia_externa": "REF123456",
+  "estado_interno": "GENERATED",
+  "estado_externo": "GENERADA",
+  "checkout_url": "https://checkout.helipagos/..."
+}
+```
+
+2. Crear pago - Helipagos no disponible (503)
+
+Si la llamada a Helipagos falla por indisponibilidad, el servicio devuelve 503 y el pago previamente persistido queda con `estado_interno = ERROR`.
+
+Response 503
+
+```json
+{
+  "status": 503,
+  "error": "SERVICE_UNAVAILABLE",
+  "message": "Helipagos service is currently unavailable",
+  "timestamp": "2026-05-11T12:34:56Z"
+}
+```
+
+En la base de datos el pago creado inicialmente permanece con:
+
+```sql
+estado_interno = 'ERROR'
+```
+
+3. Crear pago - fallo al actualizar después de crear en Helipagos (500)
+
+Si Helipagos responde correctamente pero el update local falla (por ejemplo error inesperado al persistir `id_sp`), el endpoint devuelve 500 y el pago queda en `estado_interno = ERROR`.
+
+Response 500
+
+```json
+{
+  "status": 500,
+  "error": "INTERNAL_SERVER_ERROR",
+  "message": "Failed to update payment after Helipagos response",
+  "timestamp": "2026-05-11T12:34:56Z"
+}
+```
+
+4. Consultar pago (GET) - Happy path (200 OK)
+
+Request GET /api/v1/payments/123
+
+Response 200
+
+```json
+{
+  "paymentId": 1,
+  "id_sp": "123",
+  "referencia_externa": "REF123456",
+  "estado_interno": "GENERATED",
+  "estado_externo": "PROCESADA",
+  "checkout_url": "https://checkout.helipagos/..."
+}
+```
+
+5. Cancelar pago (DELETE) - Happy path (200 OK)
+
+Request DELETE /api/v1/payments/123
+
+Response 200
+
+```json
+{
+  "paymentId": 1,
+  "id_sp": "123",
+  "referencia_externa": "REF123456",
+  "estado_interno": "CANCELLED",
+  "estado_externo": "VENCIDA",
+  "checkout_url": "https://checkout.helipagos/..."
+}
+```
+
+6. Webhook de Helipagos (reconciliación)
+
+Helipagos envía un POST a `/api/v1/payments/webhook` con el siguiente body (ejemplo):
+
+```json
+{
+  "id_sp": 123,
+  "estado": "PROCESADA",
+  "referencia_externa": "REF123456",
+  "medio_pago": "VISA",
+  "importe_abonado": "10000",
+  "fecha_importe": "2026-05-11"
+}
+```
+
+El servicio valida la `api-key` recibida en el header, busca el pago local (por `id_sp` o por `referencia_externa` si no existe) y actualiza el estado local. Si el pago estaba en `ERROR` porque falló la actualización previa, la reconciliación rellena `id_sp` y actualiza `estado_externo`, resolviendo el caso donde la creación parcial quedó pendiente.
+
 ---
 
 ## Documentación OpenAPI
 
 - Accesible en `/swagger-ui.html` al levantar el servicio.
+- ***
 
----
+## Despliegue
 
+- Deployada en Render: https://microservicio-integrador-1.onrender.com
+- Swagger UI (deploy): https://microservicio-integrador-1.onrender.com/swagger-ui/index.html
+- Health check https://microservicio-integrador-1.onrender.com/actuator/health
 
+## Autor
+
+- Camila Villalba Heuer
