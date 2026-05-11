@@ -45,12 +45,15 @@ El microservicio está diseñado para ser fácilmente integrable en arquitectura
   **Respuestas:**
   - 201: Pago creado y si la referencia externa ya existe (idempotencia)
   - 400: Request inválido
+  - 503: Servicio de Helipagos no disponible
+  - 500: Error interno en el microservicio
 
 - `GET /api/v1/payments/{idSp}`  
-  Consulta el estado de un pago por su identificador externo provisto por Helipagos.  
+  Consulta el estado de un pago por su identificador externo (id_sp) provisto por Helipagos.  
   **Seguridad:** API Key
   - 200: Detalle del pago
   - 404: No encontrado
+  - 503: Servicio de Helipagos no disponible
 
 - `DELETE /api/v1/payments/{idSp}`  
   Cancela un pago si está en estado permitido.  
@@ -58,6 +61,7 @@ El microservicio está diseñado para ser fácilmente integrable en arquitectura
   - 200: Cancelado
   - 404: No encontrado
   - 409: Estado no permite cancelación
+  - 503: Servicio de Helipagos no disponible
 
 - `POST /api/v1/payments/webhook`  
   Recibe notificaciones de Helipagos para actualizar el estado de un pago.  
@@ -82,7 +86,7 @@ El microservicio está diseñado para ser fácilmente integrable en arquitectura
 
 ## Dependencias y Justificación
 
-- **Spring Boot Starter Web / WebFlux**: Exposición de API REST y cliente HTTP reactivo.
+- **Spring Boot Starter Web / WebFlux**: Exposición de API REST y cliente HTTP.
 - **Spring Boot Starter Data JPA**: Persistencia con PostgreSQL.
 - **Spring Boot Starter Validation**: Validación de DTOs.
 - **Spring Boot Starter Security**: Seguridad y autenticación.
@@ -105,10 +109,26 @@ El microservicio está diseñado para ser fácilmente integrable en arquitectura
 
 - **Concurrencia**:
   - Para la creación de un pago se usa un try-catch: se valida que la referencia externa no exista y se intenta guardar. Si otra request guardó primero, se captura el `DataIntegrityViolationException` y se devuelve el pago ya creado.
-  - Para la cancelación de un pago, se usa el 'optimisctic locking' implementando la columna `version` al actualizar el estado.
+  - Para la cancelación y consulta de un pago, se usa el 'optimisctic locking' implementando la columna `version` al actualizar el estado.
   - En ambos casos, los métodos del servicio son transaccionales (`@Transactional`), por lo que la estrategia es:
     - **Creación**: transacción + restricción UNIQUE en BD para concurrencia.
     - **Cancelación**: transacción + optimistic locking.
+
+- **Mapeo de estados**:
+  - Se definió un mapeo claro entre los estados que devuelve Helipagos (estado externo) y los estados internos (`PaymentStatus`) del microservicio. Este mapeo permite desacoplar la lógica interna de cambios en la representación externa, facilitar la reconciliación vía webhook y mantener comportamiento consistente frente a errores o cambios del proveedor. El mapeo completo está disponible más abajo en la sección "Mapeo de estados".
+
+| Estado externo | Estado interno (`PaymentStatus`) |
+| -------------- | -------------------------------- |
+| GENERADA       | GENERATED                        |
+| PROCESADA      | PROCESSED                        |
+| ACREDITADA     | COMPLETED                        |
+| RECHAZADA      | FAILED                           |
+| DEVUELTA       | FAILED                           |
+| ANULADA        | FAILED                           |
+| VENCIDA        | CANCELLED                        |
+|                | ERROR                            |
+
+Nota: el estado interno `ERROR` no tiene mapeo desde ningún estado externo — representa errores internos no relacionados directamente con un estado remoto.
 
 - **Validación y Seguridad**:
   - Validaciones exhaustivas en DTOs.
@@ -135,10 +155,11 @@ El microservicio está diseñado para ser fácilmente integrable en arquitectura
   - El segundo bloque llama a Helipagos y luego actualiza el pago local con la respuesta (asignando `id_sp`, `checkout_url`, `estado_externo`).
   5.  Manejo de fallos y códigos HTTP:
   - Si la llamada a Helipagos falla por indisponibilidad (timeout/connection error), el endpoint devuelve 503 (Service Unavailable). El pago ya persistido queda con `estado_interno = ERROR` para indicar que la creación local se realizó pero la confirmación remota no pudo completarse.
+  - Si la llamada a Helipagos falla por bad request hacia helipagom el endpoint devuelve 400 (Bad Request). El pago ya persistido queda con `estado_interno = ERROR` para indicar que la creación local se realizó pero la confirmación remota no pudo completarse.
   - Si la llamada a Helipagos devuelve éxito pero el intento de actualizar / persistir los datos devueltos por Helipagos falla (por ejemplo error en el update local), el endpoint devuelve 500 (Internal Server Error) y el pago queda con `estado_interno = ERROR`.
   6.  Garantía operativa:
   - Con este diseño queda registrado que se intentó crear el pago aunque fallara la confirmación remota o la actualización local. El servicio deja trazas (logs) del error para facilitar investigación y reconciliación.
-  - Cuando Helipagos posteriormente envía un webhook con el cambio de estado (por ejemplo de `GENERADA` a `PROCESADA`), el endpoint de webhook realiza la reconciliación: busca por `referencia_externa`, sincroniza campos (incluido `id_sp`) y actualiza el pago local. Esto permite recuperar pagos cuyo `id_sp` no pudo almacenarse en el momento de la creación.
+  - Cuando Helipagos posteriormente envía un webhook con el cambio de estado (por ejemplo de `GENERADA` a `PROCESADA`), el endpoint de webhook realiza la reconciliación: primero buscar por busca `id_sp` y si no lo encuentra entonces busca por `referencia_externa`, sincroniza campos (incluido `id_sp`) y actualiza el pago local. Esto permite recuperar pagos cuyo `id_sp` no pudo almacenarse en el momento de la creación.
   - Si la conexión a Helipagos falló y el pago quedó almacenado localmente pero no existe en Helipagos, el registro permanecerá en `ERROR` y el cliente deberá reintentar la creación del pago enviando una nueva referencia externa.
   7. Caso no abordado:
   - El pago quedó almacenado localemnte pero en Helipagos no se creó. El pago queda con estado interno `ERROR` pero no se puede reintentar su creación desde el cliente con la misma referencia externa.
@@ -152,7 +173,7 @@ El microservicio está diseñado para ser fácilmente integrable en arquitectura
 
 - **cancelPayment**:
   - Primero sincroniza el estado con Helipagos.
-  - Verifica si se puede cancelar (solo se pueden cancelar pagos en estado RECHAZADA (FAIL) y GENERADA (CREATED))
+  - Verifica si se puede cancelar (solo se pueden cancelar pagos en estado RECHAZADA (FAIL) y GENERADA (CREATED)).
   - Llama a Helipagos para cancelar y actualiza el estado local.
   - Es idempotente: si ya está cancelado, devuelve el mismo resultado.
   - Estrategia de concurrencia: transacción + optimistic locking (columna version).
@@ -160,7 +181,7 @@ El microservicio está diseñado para ser fácilmente integrable en arquitectura
 - **processWebhook**:
   - Valida API Key.
   - Busca el pago por id_sp y si no lo encuentra busca por referencia externa (ambos datos enviados por Helipagos).
-  - En caso de que no exista el id_sp pero si la refencia externa, lo que significa que el microservicio no pudo completar exitosamente la creación del pago quedando un registro incompleto; actualiza el registtro completando con los datos falatantes.
+  - En caso de que no exista el id_sp pero sí la refencia externa, lo que significa que el microservicio no pudo completar exitosamente la creación del pago quedando un registro incompleto; actualiza el registtro completando con los datos faltantes.
   - Actualiza el estado solo si es diferente al actual.
   - Ignora webhooks duplicados o de pagos inexistentes.
 

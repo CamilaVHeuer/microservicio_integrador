@@ -18,69 +18,73 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class AuthServiceImp implements AuthService {
 
-    private final ApiKeyRepository apiKeyRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final UserRepository userRepository;
-    private final ApiKeyUtils apiKeyUtils;
+  private final ApiKeyRepository apiKeyRepository;
+  private final PasswordEncoder passwordEncoder;
+  private final UserRepository userRepository;
+  private final ApiKeyUtils apiKeyUtils;
 
-    public AuthServiceImp(ApiKeyRepository apiKeyRepository, PasswordEncoder passwordEncoder, UserRepository userRepository, ApiKeyUtils apiKeyUtils) {
-        this.apiKeyRepository = apiKeyRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.userRepository = userRepository;
-        this.apiKeyUtils = apiKeyUtils;
+  public AuthServiceImp(
+      ApiKeyRepository apiKeyRepository,
+      PasswordEncoder passwordEncoder,
+      UserRepository userRepository,
+      ApiKeyUtils apiKeyUtils) {
+    this.apiKeyRepository = apiKeyRepository;
+    this.passwordEncoder = passwordEncoder;
+    this.userRepository = userRepository;
+    this.apiKeyUtils = apiKeyUtils;
+  }
+
+  @Override
+  public ApiKeyResponse registerUser(RegisterRequest registerRequest) {
+    String username = registerRequest.username();
+    String password = registerRequest.password();
+
+    if (userRepository.existsByUsername(username)) {
+      throw new StatusConflictException("Username already exists");
+    }
+    User user = new User();
+    user.setUsername(username);
+    user.setPassword(passwordEncoder.encode(password));
+    User savedUser = userRepository.save(user);
+
+    return createAndSaveApiKey(savedUser);
+  }
+
+  @Override
+  public ApiKeyResponse regenerateApiKey(ApiKeyRequest apiKeyRequest) {
+    String username = apiKeyRequest.username();
+    String password = apiKeyRequest.password();
+
+    User user =
+        userRepository
+            .findByUsername(username)
+            .orElseThrow(() -> new InvalidCredentialsException("Invalid credentials"));
+
+    if (!user.getActive()) {
+      throw new InvalidCredentialsException("User inactive");
     }
 
-    @Override
-    public ApiKeyResponse registerUser(RegisterRequest registerRequest) {
-        String username = registerRequest.username();
-        String password = registerRequest.password();
-
-        if(userRepository.existsByUsername(username)) {
-            throw new StatusConflictException("Username already exists");
-        }
-        User user = new User();
-        user.setUsername(username);
-        user.setPassword(passwordEncoder.encode(password));
-        User savedUser = userRepository.save(user);
-
-        return createAndSaveApiKey(savedUser);
-
+    if (!passwordEncoder.matches(password, user.getPassword())) {
+      throw new InvalidCredentialsException("Invalid credentials");
     }
 
-    @Override
-    public ApiKeyResponse regenerateApiKey(ApiKeyRequest apiKeyRequest) {
-        String username = apiKeyRequest.username();
-        String password = apiKeyRequest.password();
+    return createAndSaveApiKey(user);
+  }
 
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new InvalidCredentialsException("Invalid credentials"));
+  // helper method
+  private ApiKeyResponse createAndSaveApiKey(User user) {
+    String apiKeyGenerated = apiKeyUtils.generateApiKey();
+    String prefix = apiKeyUtils.extractPrefix(apiKeyGenerated);
+    String keyHash = passwordEncoder.encode(apiKeyGenerated);
 
-        if (!user.getActive()) {
-            throw new InvalidCredentialsException("User inactive");
-        }
+    ApiKey apikey = new ApiKey();
+    apikey.setKeyPrefix(prefix);
+    apikey.setKeyHash(keyHash);
+    apikey.setUser(user);
+    apikey.setExpiresAt(null);
 
-        if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new InvalidCredentialsException("Invalid credentials");
-        }
+    apiKeyRepository.save(apikey);
 
-        return createAndSaveApiKey(user);
-
-    }
-
-    //helper method
-    private ApiKeyResponse createAndSaveApiKey(User user){
-        String apiKeyGenerated = apiKeyUtils.generateApiKey();
-        String prefix = apiKeyUtils.extractPrefix(apiKeyGenerated);
-        String keyHash = passwordEncoder.encode(apiKeyGenerated);
-
-        ApiKey apikey = new ApiKey();
-        apikey.setKeyPrefix(prefix);
-        apikey.setKeyHash(keyHash);
-        apikey.setUser(user);
-        apikey.setExpiresAt(null);
-
-        apiKeyRepository.save(apikey);
-
-        return new ApiKeyResponse(apiKeyGenerated);
-    }
+    return new ApiKeyResponse(apiKeyGenerated);
+  }
 }
