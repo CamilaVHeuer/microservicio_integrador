@@ -232,7 +232,7 @@ docker-compose up --build
   ```bash
   ./mvnw test
   ```
-
+Los test corren con el perfil "test" usando variables de entorno definidas para los test, las mismas se encuentran el application-test.yml. 
 ---
 
 ## Base de Datos y Migraciones
