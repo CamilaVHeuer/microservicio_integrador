@@ -9,14 +9,12 @@ import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCre
 import com.camicompany.microserviciointegrador.dto.createPaymentDto.HelipagosCreatePaymentResponse;
 import com.camicompany.microserviciointegrador.dto.getPaymentDto.HelipagosGetPaymentResponse;
 import com.camicompany.microserviciointegrador.dto.weebhookDto.HelipagosWebhookRequest;
-import com.camicompany.microserviciointegrador.exception.ExternalServiceBadRequestException;
-import com.camicompany.microserviciointegrador.exception.ExternalServiceException;
-import com.camicompany.microserviciointegrador.exception.ResourceNotFoundException;
-import com.camicompany.microserviciointegrador.exception.StatusConflictException;
+import com.camicompany.microserviciointegrador.exception.*;
 import com.camicompany.microserviciointegrador.mapper.PaymentMapper;
 import com.camicompany.microserviciointegrador.repository.PaymentRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -88,15 +86,47 @@ public class PaymentServiceImp implements PaymentService {
 
             return PaymentMapper.toResponseDto(updated);
 
-        } catch (Exception e) {
-            log.error("Error creating payment in Helipagos, paymentId={}",
+        } catch (ExternalServiceBadRequestException e) {
+
+            log.error("Invalid request to Helipagos, paymentId={}",
                     pendingPayment.getId(),
                     e);
 
-            Payment errorPayment = markAsError(pendingPayment.getId()
-            );
+            markErrorSafely(pendingPayment.getId());
 
-            return  PaymentMapper.toResponseDto(errorPayment);
+            throw e;
+        }
+
+        catch (ExternalServiceException e) {
+
+            log.error("Helipagos unavailable, paymentId={}",
+                    pendingPayment.getId(),
+                    e);
+
+            markErrorSafely(pendingPayment.getId());
+
+            throw e;
+        }
+        catch (InternalServiceException e) {
+            log.error("Error updating pendingPayment, paymentId={}",
+                    pendingPayment.getId(),
+                    e);
+
+            markErrorSafely(pendingPayment.getId());
+
+            throw e;
+        }
+        catch (Exception e) {
+            log.error("Unexpected error creating payment, paymentId={}",
+                    pendingPayment.getId(),
+                    e);
+
+            markErrorSafely(pendingPayment.getId());
+
+            throw new InternalServiceException(
+                    "Unexpected internal error",
+                    e
+            );
         }
     }
 
@@ -131,14 +161,22 @@ public class PaymentServiceImp implements PaymentService {
     }
 
     @Transactional
-    public Payment markAsError(Long paymentId) {
+    public void markAsError(Long paymentId) {
 
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow();
 
         payment.setEstadoInterno(PaymentStatus.ERROR);
 
-        return paymentRepository.save(payment);
+        paymentRepository.save(payment);
+    }
+
+    private void markErrorSafely(Long paymentId) {
+        try {
+            markAsError(paymentId);
+        } catch (Exception e) {
+            log.error("Could not mark payment as error", e);
+        }
     }
 
     @Transactional

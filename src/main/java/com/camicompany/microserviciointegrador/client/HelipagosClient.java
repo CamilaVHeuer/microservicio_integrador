@@ -79,7 +79,6 @@ public class HelipagosClient {
     public HelipagosGetPaymentResponse getPayment(String idSp) {
 
         try {
-            //Uso un post porque en la documentacion dice POST y en el archivo pdf dice get
             List<HelipagosGetPaymentResponse> responseList = webClient.post()
                     .uri(baseUrl + getPaymentPath + "?id=" + idSp)
                     .header("Authorization", "Bearer " + token)
@@ -118,7 +117,7 @@ public class HelipagosClient {
                     .header("Authorization", "Bearer " + token)
                     .header("Content-Type", "application/json")
                     .retrieve()
-                    .toBodilessEntity() // 👈 clave
+                    .toBodilessEntity()
                     .block();
 
         } catch (WebClientRequestException e) {

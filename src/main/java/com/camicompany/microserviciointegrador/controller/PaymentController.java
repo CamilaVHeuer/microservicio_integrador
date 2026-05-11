@@ -29,7 +29,9 @@ public class PaymentController {
     @ApiResponses({
         @ApiResponse(responseCode = "201", description = "Payment created",
             content = @Content(mediaType = "application/json", schema = @Schema(implementation = PaymentResponse.class))),
-        @ApiResponse(responseCode = "400", description = "Invalid request", content = @Content)
+        @ApiResponse(responseCode = "400", description = "Invalid request", content = @Content),
+        @ApiResponse(responseCode = "500", description = "Internal server error: an unexpected error occurred in the integrator service", content = @Content),
+        @ApiResponse(responseCode = "503", description = "Service unavailable: Helipagos is unreachable", content = @Content)
     })
     @PostMapping
     public ResponseEntity<PaymentResponse> createPayment(@Valid @RequestBody CreatePaymentRequest request) {
@@ -41,7 +43,8 @@ public class PaymentController {
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Payment found",
             content = @Content(mediaType = "application/json", schema = @Schema(implementation = PaymentResponse.class))),
-        @ApiResponse(responseCode = "404", description = "Payment not found", content = @Content)
+        @ApiResponse(responseCode = "404", description = "Payment not found", content = @Content),
+        @ApiResponse(responseCode = "503", description = "Service unavailable: Helipagos is unreachable", content = @Content)
     })
     @GetMapping("/{idSp}")
     public ResponseEntity<PaymentResponse> getPayment(@PathVariable String idSp) {
@@ -54,7 +57,8 @@ public class PaymentController {
         @ApiResponse(responseCode = "200", description = "Payment cancelled",
             content = @Content(mediaType = "application/json", schema = @Schema(implementation = PaymentResponse.class))),
         @ApiResponse(responseCode = "404", description = "Payment not found", content = @Content),
-        @ApiResponse(responseCode = "409", description = "Cannot cancel payment in the current state", content = @Content)
+        @ApiResponse(responseCode = "409", description = "Cannot cancel payment in the current state", content = @Content),
+        @ApiResponse(responseCode = "503", description = "Service unavailable: Helipagos is unreachable", content = @Content)
     })
     @DeleteMapping("/{idSp}")
     public ResponseEntity<PaymentResponse> cancelPayment(@PathVariable String idSp) {
