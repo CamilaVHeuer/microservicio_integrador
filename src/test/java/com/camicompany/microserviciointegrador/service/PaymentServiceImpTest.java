@@ -106,6 +106,161 @@ public class PaymentServiceImpTest {
                 .createPayment(any());
     }
 
+    @Test
+    void createPaymentWhenDuplicateReference() {
+
+        CreatePaymentRequest req = new CreatePaymentRequest(
+                1000L,
+                "desc",
+                LocalDate.now().plusDays(1),
+                "ref1"
+        );
+
+        Payment existing = createPaymentEntity(
+                "1",
+                "desc",
+                "REF1",
+                "GENERADA",
+                PaymentStatus.GENERATED,
+                "checkoutUrl"
+        );
+
+        existing.setId(1L);
+
+        // createPendingPayment() -> paymentRepository.save()
+        when(paymentRepository.save(any(Payment.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+        // catch -> find existing payment
+        when(paymentRepository.findByReferenciaExterna("REF1"))
+                .thenReturn(Optional.of(existing));
+
+        PaymentResponse response = paymentService.createPayment(req);
+
+        assertNotNull(response);
+
+        assertEquals(1L, response.paymentId());
+        assertEquals("1", response.id_sp());
+        assertEquals("REF1", response.referencia_externa());
+        assertEquals("GENERATED", response.estado_interno());
+        assertEquals("GENERADA", response.estado_externo());
+        assertEquals("checkoutUrl", response.checkout_url());
+
+        verify(helipagosClient, never()).createPayment(any());
+
+        verify(paymentRepository, times(1)).save(any(Payment.class));
+
+        verify(paymentRepository)
+                .findByReferenciaExterna("REF1");
+    }
+
+    @Test
+    void createPaymentShouldThrowExternalServiceExceptionWhenHelipagosUnavailableAndMarkStatusPaymentAsError() {
+
+        CreatePaymentRequest req = new CreatePaymentRequest(
+                1000L,
+                "desc",
+                LocalDate.now().plusDays(1),
+                "ref1"
+        );
+
+
+        when(paymentRepository.save(any(Payment.class)))
+                .thenAnswer(invocation -> {
+
+                    Payment payment = invocation.getArgument(0);
+
+                    if (payment.getId() == null) {
+                        payment.setId(1L);
+                        return payment;
+                    }
+                    return payment;
+                });
+
+        when(helipagosClient.createPayment(any()))
+                .thenThrow(new ExternalServiceException ("Helipagos unavailable"));
+
+        when(paymentRepository.findById(1L))
+                .thenAnswer(invocation -> {
+
+                    Payment payment = new Payment();
+
+                    payment.setId(1L);
+                    payment.setReferenciaExterna("REF1");
+                    payment.setImporte(1000L);
+                    payment.setDescripcion("desc");
+                    payment.setEstadoInterno(PaymentStatus.PENDING);
+
+                    return Optional.of(payment);
+                });
+
+
+        assertThrows(ExternalServiceException.class, () -> paymentService.createPayment(req));
+
+        verify(helipagosClient).createPayment(any());
+        verify(paymentRepository, atLeast(2)).save(captor.capture());
+        List<Payment> savedPayments = captor.getAllValues();
+
+        assertEquals(2, savedPayments.size());
+
+        assertTrue(savedPayments.stream()
+                .anyMatch(p -> p.getEstadoInterno() == PaymentStatus.ERROR)
+        );
+    }
+
+    @Test
+    void createPaymentShouldThrowExternalServiceBadRequestExceptionWhenBadRequestToHelipagosAndMarkStatusPaymentAsError() {
+
+        CreatePaymentRequest req = new CreatePaymentRequest(
+                1000L,
+                "desc",
+                LocalDate.now().plusDays(1),
+                "ref1"
+        );
+
+
+        when(paymentRepository.save(any(Payment.class)))
+                .thenAnswer(invocation -> {
+
+                    Payment payment = invocation.getArgument(0);
+
+                    if (payment.getId() == null) {
+                        payment.setId(1L);
+                        return payment;
+                    }
+                    return payment;
+                });
+
+        when(helipagosClient.createPayment(any()))
+                .thenThrow(new ExternalServiceBadRequestException("Bad Request to Helipagos"));
+
+        when(paymentRepository.findById(1L))
+                .thenAnswer(invocation -> {
+
+                    Payment payment = new Payment();
+
+                    payment.setId(1L);
+                    payment.setReferenciaExterna("REF1");
+                    payment.setImporte(1000L);
+                    payment.setDescripcion("desc");
+                    payment.setEstadoInterno(PaymentStatus.PENDING);
+
+                    return Optional.of(payment);
+                });
+
+        assertThrows(ExternalServiceBadRequestException.class, () -> paymentService.createPayment(req));
+
+        verify(helipagosClient).createPayment(any());
+        verify(paymentRepository, atLeast(2)).save(captor.capture());
+        List<Payment> savedPayments = captor.getAllValues();
+
+        assertEquals(2, savedPayments.size());
+
+        assertTrue(savedPayments.stream()
+                .anyMatch(p -> p.getEstadoInterno() == PaymentStatus.ERROR)
+        );
+    }
+
 
     @Test
     void getPaymentExistingSuccessfully() {
@@ -181,111 +336,6 @@ public class PaymentServiceImpTest {
         assertEquals("PROCESADA", payment.getEstadoExterno());
         assertEquals("checkoutUrl", payment.getCheckoutUrl());
         verify(paymentRepository).save(payment);
-    }
-
-    @Test
-    void createPaymentWhenDuplicateReference() {
-
-        CreatePaymentRequest req = new CreatePaymentRequest(
-                1000L,
-                "desc",
-                LocalDate.now().plusDays(1),
-                "ref1"
-        );
-
-        Payment existing = createPaymentEntity(
-                "1",
-                "desc",
-                "REF1",
-                "GENERADA",
-                PaymentStatus.GENERATED,
-                "checkoutUrl"
-        );
-
-        existing.setId(1L);
-
-        // createPendingPayment() -> paymentRepository.save()
-        when(paymentRepository.save(any(Payment.class)))
-                .thenThrow(new DataIntegrityViolationException("duplicate key"));
-
-        // catch -> find existing payment
-        when(paymentRepository.findByReferenciaExterna("REF1"))
-                .thenReturn(Optional.of(existing));
-
-        PaymentResponse response = paymentService.createPayment(req);
-
-        assertNotNull(response);
-
-        assertEquals(1L, response.paymentId());
-        assertEquals("1", response.id_sp());
-        assertEquals("REF1", response.referencia_externa());
-        assertEquals("GENERATED", response.estado_interno());
-        assertEquals("GENERADA", response.estado_externo());
-        assertEquals("checkoutUrl", response.checkout_url());
-
-        verify(helipagosClient, never()).createPayment(any());
-
-        verify(paymentRepository, times(1)).save(any(Payment.class));
-
-        verify(paymentRepository)
-                .findByReferenciaExterna("REF1");
-    }
-
-    @Test
-    void createPaymentShouldReturnErrorPaymentWhenHelipagosUnavailable() {
-
-        CreatePaymentRequest req = new CreatePaymentRequest(
-                1000L,
-                "desc",
-                LocalDate.now().plusDays(1),
-                "ref1"
-        );
-
-
-        when(paymentRepository.save(any(Payment.class)))
-                .thenAnswer(invocation -> {
-
-                    Payment payment = invocation.getArgument(0);
-
-                    // createPendingPayment()
-                    if (payment.getId() == null) {
-                        payment.setId(1L);
-                        return payment;
-                    }
-
-                    // markAsError()
-                    return payment;
-                });
-
-        when(helipagosClient.createPayment(any()))
-                .thenThrow(new ExternalServiceException("Helipagos unavailable"));
-
-        when(paymentRepository.findById(1L))
-                .thenAnswer(invocation -> {
-
-                    Payment payment = new Payment();
-
-                    payment.setId(1L);
-                    payment.setReferenciaExterna("REF1");
-                    payment.setImporte(1000L);
-                    payment.setDescripcion("desc");
-                    payment.setEstadoInterno(PaymentStatus.PENDING);
-
-                    return Optional.of(payment);
-                });
-
-
-        PaymentResponse response = paymentService.createPayment(req);
-
-        assertEquals(1L, response.paymentId());
-        assertEquals("REF1", response.referencia_externa());
-        assertEquals("ERROR", response.estado_interno());
-        assertNull(response.id_sp());
-        assertNull(response.estado_externo());
-        assertNull(response.checkout_url());
-
-        verify(helipagosClient).createPayment(any());
-        verify(paymentRepository, atLeast(2)).save(any(Payment.class));
     }
 
     @Test
